@@ -1,0 +1,49 @@
+{
+  "version": "0.1.0",
+  "name": "fundraisely",
+  "instructions": [
+    {
+      "name": "initGlobalConfig",
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "initPoolRoom",
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "joinRoom",
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "endRoom",
+      "accounts": [],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "globalConfig",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "room",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "playerEntry",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}

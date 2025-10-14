@@ -1,0 +1,27 @@
+==================================================
+THE PROBLEM: Rust Nightly was creating incompatible Cargo.lock
+==================================================
+
+✅ I FIXED IT: Switched you to stable Rust 1.87
+
+==================================================
+NOW RUN THESE COMMANDS IN POWERSHELL:
+==================================================
+
+cd C:\Users\isich\fundraisely\solana-program\fundraisely
+
+Remove-Item Cargo.lock -Force
+
+$env:HOME = "C:\Users\isich"
+$env:SBF_SDK_PATH = "C:\Users\isich\.cargo\bin\sdk\sbf"
+
+anchor build
+
+==================================================
+THIS SHOULD WORK NOW!
+==================================================
+
+Your Rust is now on STABLE version (not nightly)
+So it won't create the v4 lock file anymore.
+
+==================================================

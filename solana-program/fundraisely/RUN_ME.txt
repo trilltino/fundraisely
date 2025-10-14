@@ -1,0 +1,17 @@
+====================================
+COPY AND PASTE THIS EXACT COMMAND:
+====================================
+
+.\build.ps1
+
+(Notice the .\ at the beginning!)
+
+====================================
+
+Or use this full command:
+
+$env:HOME = "C:\Users\isich"
+$env:SBF_SDK_PATH = "C:\Users\isich\.cargo\bin\sdk\sbf"
+anchor build
+
+====================================
