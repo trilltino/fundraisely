@@ -1,3 +1,66 @@
+//! # Authentication Middleware
+//!
+//! ## Purpose
+//! Provides API key-based authentication for protected endpoints in the Axum backend:
+//! - Admin endpoints (configuration, monitoring)
+//! - Privileged operations (manual overrides, debugging)
+//! - Optional logging for unauthenticated requests
+//!
+//! ## Architecture Role
+//! Middleware layer that intercepts requests before reaching handlers:
+//! - Validates Authorization header against configured API key
+//! - Different security levels for development vs production
+//! - Logs authentication attempts for security monitoring
+//!
+//! ## Integration with Frontend (src/)
+//! Frontend would send API key for admin operations:
+//! ```javascript
+//! const response = await fetch('/admin/override-room', {
+//!   method: 'POST',
+//!   headers: {
+//!     'Authorization': 'Bearer your-api-key-here',
+//!     'Content-Type': 'application/json'
+//!   },
+//!   body: JSON.stringify({ room_id: 'room-123' })
+//! });
+//! ```
+//!
+//! ## Integration with Solana Program
+//! This middleware is **independent** of Solana program:
+//! - Protects backend API endpoints, not blockchain operations
+//! - On-chain access control handled by program's own account validation
+//! - Useful for backend-only operations like:
+//!   - Configuration updates
+//!   - Cache invalidation
+//!   - Metrics access
+//!
+//! ## Security Model
+//! - **Development Mode**: Warning logged but requests allowed without API key
+//! - **Production Mode**: API key required, requests rejected without valid key
+//! - **Format**: Bearer token in Authorization header
+//! - **Storage**: API key loaded from `ADMIN_API_KEY` environment variable
+//!
+//! ## Performance Benefits
+//! - **Minimal Overhead**: Simple string comparison (~100 nanoseconds)
+//! - **No Database Lookup**: Environment variable cached in memory
+//! - **Early Rejection**: Invalid requests rejected before handler processing
+//!
+//! ## Current Status
+//! - [x] Bearer token validation
+//! - [x] Development/production mode switching
+//! - [x] Optional authentication middleware
+//! - [x] Test skeleton
+//! - [ ] **TODO**: Add token expiration/rotation
+//! - [ ] **TODO**: Add role-based access control
+//! - [ ] **TODO**: Add request rate limiting per API key
+//! - [ ] **TODO**: Add audit logging to file/database
+//!
+//! ## Known Limitations
+//! - Single static API key (no multi-user support)
+//! - No token rotation mechanism
+//! - No role-based permissions
+//! - Tests are incomplete skeletons
+
 use axum::{
     extract::Request,
     http::StatusCode,

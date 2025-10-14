@@ -1,0 +1,1115 @@
+Quiz – impact campaign – game flow
+ 
+Here is the actual game flow
+ in a total brain dump.
+ A host sets up a room and 
+send
+ the contract the room id and the fee and the fee token 
+( on
+ sol this will be 
+sol
+, 
+usdc
+ or 
+pysud
+. )
+ the host then also select the prize method, 
+its
+ is either % of pool or they add other assets. these other assets must be 
+escrowed
+ to the contract before players can join. if they select prize pool the contract works like this 20% platform fees (to our wallet) a min of 40% to the charity and the host controls the other 40%. from the host controlled 40% they can take 5% for themselves (host payment options) and then 40% - host payment for the prizes, if the host does not use the 40% so say 0 for host 20% for prizes, then the balance also goes to the 
+charity
+, so the 
+charity
+ will get 60% in that case. the host will decide on the 
+charity
+ and the charity wallet address will be provided by the host. in 
+addition
+ to this, if they select the pool they must also 
+decide
+ how much of that they need for 1st, 2nd and third 
+place
+ (these must make up 100% but 
+it’s
+ a 100% of the prize, not the total pool so if they prize was 20% of the total pool 100% of that must be used for prizes
+)  
+on stellar this was 
+init_pool
+ room. 
+For 
+init_asset_room
+, the host sets up the room with the fee token, the fee, the 
+charity
+, and they control 5% of the room intake which they can optionally pay to 
+themselves
+. 
+if 
+the do not pay 
+them selves
+ 5% then
+ its 20% platform 80% charity or 20% platform, 80%
+ 
+less host payment up to 5% to charity
+. 
+ the 
+charity
+ wallet is supplied
+ by the front end
+. they also tell the contract what assets 
+1st p
+lace
+ will be
+, 2nd and third. only after they add the assets to the contract can players join. 
+F
+or a player to join the room the must pay the fee , but we have extras, so the min the can pay is the fee, anything extra is classed as extras they purchases ( these actual extras 
+don’t
+ need to be in the contract, just the full payment amount split by fee and extras) game logic is not in the contract. when the game is over, 
+prizes
+ are distributed, the host gives the winning wallets and the prizes are distributed, platform fee and charity amount so the room value goes to 0. the front end will send the winning wallets. the platform fee wallet will be hardcoded in the contract.
+ for the 
+chairy
+ funds, on stellar we were sending this to a treasury contract as we are using the giving block for 
+chairy
+ distributions, and they are on 
+evm
+, so we need to bridge, the idea was with a 
+separate
+ contract we can batch bridge to reduce fees so we need to know what charity, 
+ we used a
+ memo when sending the funds to the treasury contract, this treasury contract address 
+was
+ hardcoded into the game contract and we need a 
+separate
+ contact for this, 
+which
+ I never got done on stellar. 
+The Giving block is supported on 
+solana
+, so we don’t need a treasury contract.  Instead on prize distribution, this address will also be fed to the contract.  We need our quiz app to do some 
+back end
+ work here, so the user will select the charity by name in our front 
+end
+ and our back end will
+ call
+ the giving 
+blocks
+ Public API to fetch the org and get/prepare a donation addres
+s and this is the charity address to be used.  
+On 
+end_room
+, your program transfers the charity share directly to the stored 
+T
+he
+ giving blocks
+ address
+.
+ We fully need to clarify what the giving block needs.
+Based on this I have the following, but it might need improvement, or optimisation so it is a guide.  Maybe use 
+openzeplin
+ for security stuff 
+FundRaisely
+ — Solana Smart Contract &amp; Backend Dev Doc (Anchor + TGB)
+Audience: Solana Anchor engineer + backend engineer.
+Goal: Build the Solana on-chain payouts contract that mirrors our working Stellar (Soroban) flow and plugs into our existing frontend calls. No bridging needed — charity payouts go directly to The Giving Block (TGB) donation address for the selected charity on Solana.
+1) Scope &amp; Principles
+On-chain responsibilities (Solana program, Anchor):
+Create “rooms” that accept player payments in a single 
+fee mint
+ (e.g., USDC).
+Support 
+two prize modes
+:
+Split (pool)
+: prizes are a % of the 
+prize pool
+ (not total pot).
+Assets
+: host escrows up to 3 predeclared SPL prizes into program vaults.
+Allow players to 
+join
+ (entry fee + optional extras in the same transaction).
+End
+ a room: atomically compute and transfer platform fee (fixed 20%), host fee (≤5%), 
+charity share (≥40%)
+, and prizes (split or escrowed assets).
+Recovery
+ path for abandoned rooms (admin-initiated, 90% refunds to players, 10% platform).
+Off-chain responsibilities (Backend):
+Resolve 
+charity donation address on Solana
+ via 
+The Giving Block
+ (TGB) for the selected charity and asset (SOL or SPL USDC). Persist address + memo 
+before
+ room creation.
+Optional: token allowlist management (admin surface).
+Frontend status:
+ already wired to these function names; pass exact arguments below.
+2) Constants &amp; Config
+Hard-coded (in program):
+PLATFORM_FEE_BPS = 2000 (20%)
+HOST_FEE_MAX_BPS = 500 (≤5%)
+HOST_CONTROLLED_MAX_BPS = 4000 (
+host_fee_bps
+ + 
+prize_pool_bps
+ ≤ 40%)
+CHARITY_MIN_BPS = 4000 (≥40%)
+PLATFORM_WALLET: 
+Pubkey
+ = &lt;YOUR_PLATFORM_PUBKEY&gt; ← put behind a feature gate if needed.
+Program design: SPL-only path
+Prefer SPL tokens (e.g., USDC). If SOL is needed, use 
+wSOL
+ so all transfers go via SPL Token Program (single code path).
+3) Accounts, PDAs &amp; State
+3.1 PDAs
+Room PDA: ["room", host, 
+room_id
+]
+TreasuryVault
+ ATA: ["
+treasury_vault
+", room, 
+fee_mint
+] (program-owned)
+PrizeVault
+[
+i
+] ATA: ["
+prize_vault
+", room, 
+prize_mint
+, 
+i
+] (asset mode; 
+i
+ 
+∈
+ {0,1,2})
+Optional Receipt PDA: ["receipt", room, player] (join record)
+TokenRegistry
+ PDA (global allowlist): ["
+token_registry
+"]
+Ownership: vault ATAs must be owned by a program-derived 
+room authority PDA
+ so only program logic moves funds.
+3.2 State
+pub 
+enum
+ 
+PrizeMode
+ 
+{ Split
+ = 0, Assets = 
+1 }
+pub 
+enum
+ 
+RoomStatus
+ 
+{ 
+AwaitingFunding
+=0, 
+PartiallyFunded
+=1, Ready=2, Active=3, Ended=
+4 }
+pub
+ struct Room {
+  // Identity
+  pub 
+room_id
+: String,
+  pub host: 
+Pubkey
+,
+  // Currency
+  pub 
+fee_mint
+: 
+Pubkey
+,   
+   // SPL mint used for joins and non-asset payouts
+  pub 
+entry_fee
+: u64,
+  // Splits (bp = basis points over 10_000)
+  pub 
+host_fee_bps
+: u
+16,   
+  // 
+0..
+=500
+  pub 
+prize_pool_bps
+: u
+16,   
+// with 
+host_fee_bps
+ &lt;= 4000 total
+  // Mode &amp; distribution
+  pub 
+prize_mode
+: u
+8,   
+     // 0=Split, 1=Assets
+  pub 
+prize_distribution_bps
+: [u16; 3], // sum=10000 (100% of prize pool) if Split
+  // Charity (resolved by backend from TGB)
+  pub 
+charity_wallet
+: 
+Pubkey
+, // TGB donation address on Solana for 
+fee_mint
+  pub 
+charity_memo
+: 
+String,   
+// optional memo for reconciliation
+  // Lifecycle
+  pub status: u
+8,   
+          // 
+RoomStatus
+  pub ended: bool,
+  // Accounting
+  pub 
+total_pool
+: u64,
+  pub 
+total_entry_fees
+: u64,
+  pub 
+total_extras_fees
+: u64,
+  pub 
+player_count
+: u32,
+  // Winners (filled before 
+end_room
+)
+  pub winners: [Option&lt;
+Pubkey
+&gt;; 3],
+  // Ops
+  pub paused: bool,
+  pub 
+recovery_started_at_slot
+: Option&lt;u64&gt;,
+}
+4) Instruction Set (Anchor) — names match frontend calls
+Below: function signatures (conceptual), required accounts, and key validations.
+4.1 Admin / Registry
+initialize(
+admin, 
+platform_wallet
+)
+Create 
+token_registry
+, set admin, set global flags.
+Accounts: admin (signer), 
+token_registry
+ (PDA 
+init
+), 
+system_program
+Behavior
+: initialize once.
+add_approved_token
+(mint) / 
+remove_approved_token
+(mint)
+ (admin)
+Toggle fee mints.
+Accounts: admin (signer), 
+token_registry
+ (mut), mint
+Behavior
+: maintain allowlist for 
+fee_mint
+.
+pause(
+) / 
+unpause
+(
+)
+ (admin)
+Global switch on registry; or add per-room pause if desired.
+4.2 Room Lifecycle
+init_pool_
+room
+(
+room_id
+, 
+fee_mint
+, 
+entry_fee
+, 
+host_fee_
+bps
+?,
+ 
+prize_pool_bps
+, 
+dist_first
+, 
+dist_second
+, 
+dist_third
+, 
+charity_wallet
+, 
+charity_memo
+)
+Accounts:
+host (signer)
+room (PDA 
+init
+)
+treasury_vault
+ (ATA 
+init
+ for 
+fee_mint
+ owned by program authority)
+token_registry
+, 
+fee_mint
+system_program
+, 
+token_program
+, 
+associated_token_program
+, rent
+Validations:
+fee_mint
+ enabled in registry; 
+entry_fee
+ &gt; 0
+host_fee_bps
+ &lt;= 500
+host_fee_bps
+ + 
+prize_pool_bps
+ &lt;= 4000
+implied charity = 10000 - 2000 - (
+host_fee_bps
+ + 
+prize_pool_bps
+) &gt;= 4000
+dist_first
+ + 
+dist_second
+ + 
+dist_third
+ == 10000 (any can be 0)
+Effects:
+Write Room 
+{ 
+prize
+_mode
+=Split, status=Ready, 
+... }
+Emit 
+RoomCreated
+.
+init_asset_
+room
+(
+room_id
+, 
+fee_mint
+, 
+entry_fee
+, 
+host_fee_
+bps
+?,
+ 
+expected_
+prizes
+[
+(mint, amount) up to 3], 
+charity_wallet
+, 
+charity_memo
+)
+Accounts: same as above + each 
+prize_mint
+[
+i
+] + 
+prize_vault
+[
+i
+] (ATA 
+init
+).
+Validations: fee mint &amp; splits as above (no 
+prize_pool_bps
+ required).
+Effects:
+Create prize vaults (empty), status=
+AwaitingFunding
+.
+deposit_prize_
+asset
+(
+room_id
+, 
+prize_index
+)
+ (host)
+Accounts:
+host (signer), room (mut)
+host_prize_ata
+, 
+prize_vault
+[index], 
+prize_mint
+[index]
+token_program
+Validations:
+prize_mode
+=Assets; status in {
+AwaitingFunding
+, 
+PartiallyFunded
+}
+Transfer exact expected amount host → program vault.
+Effects:
+Mark that index funded; set status=Ready when all funded.
+Emit 
+PrizeAssetDeposited
+ 
+{ 
+all
+_
+funded
+ }
+.
+close_joining
+(
+room_id
+)
+ (optional; convenience)
+Accounts: host (signer), room (mut)
+Effects: status=Active if currently Ready; emit 
+JoinClosed
+.
+4.3 Player Money In
+join_
+room
+(
+room_id
+, 
+extras_amount
+)
+ (player)
+Accounts:
+player (signer), room (mut)
+player_fee_ata
+, 
+treasury_vault
+, 
+fee_mint
+token_program
+Preconditions:
+Global not paused; room not paused.
+status in {Ready, Active}.
+Asset mode: all prize vaults funded.
+Effects:
+Transfer (
+entry_fee
+ + 
+extras_amount
+) from player → 
+treasury_vault
+.
+total_pool
+ += 
+total_paid
+; 
+total_entry_fees
+ += 
+entry_fee
+; 
+total_extras_fees
+ += 
+extras_amount
+; 
+player_count
+ += 1
+If was Ready, flip status=Active.
+Optional: write Receipt 
+{ 
+entry
+_paid
+, 
+extras_
+paid
+ }
+.
+Emit 
+PlayerJoined
+.
+4.4 Winners &amp; Payouts
+declare_
+winners
+(
+room_id
+, winners: [Option&lt;
+Pubkey
+&gt;;3])
+ (host)
+Accounts: host (signer), room (mut)
+Validations:
+Pool mode: number of winners == number of non-zero 
+prize_distribution_bps
+.
+Asset mode: number of winners == number of funded 
+PrizeVaults
+.
+Winners must be unique, must have joined, and cannot be the host.
+Effects: store 
+winners
+ array; emit 
+WinnersDeclared
+.
+end_room
+(
+room_id
+)
+ (host) — 
+atomic payouts + close
+Accounts (depends on mode):
+host (signer), room (mut)
+treasury_vault
+ (mut)
+Platform
+: 
+platform_fee_ata
+ (for 
+fee_mint
+)
+Charity
+: 
+charity_fee_ata
+ (for 
+fee_mint
+) — 
+this is the TGB donation address’s ATA for the fee mint (e.g., USDC)
+If charity wallet is a SOL address and fee is USDC, derive/create ATA for that wallet and mint.
+Host
+: 
+host_fee_ata
+ (if 
+host_fee_bps
+ &gt; 0)
+Winners (pool mode)
+: winner ATAs for 
+fee_mint
+Winners (asset mode)
+: each 
+prize_vault
+[
+i
+] + each winner’s ATA for 
+prize_mint
+[
+i
+]
+fee_mint
+, 
+token_program
+, 
+associated_token_program
+Preconditions:
+ended == false; 
+player_count
+ &gt; 0; winners set and valid
+Computation:
+platform = 
+total_pool
+ * 2000 / 10_000
+host = 
+total_pool
+ * 
+host_fee_bps
+ / 10_000 (≤ 5%)
+prize_pool
+ = (Split mode) 
+total_pool
+ * 
+prize_pool_bps
+ / 10_000
+charity = 
+total_pool
+ - (platform + host + 
+prize_pool
+)
+Assert charity &gt;= 
+total_pool
+ * 4000 / 10_000
+Transfers:
+From 
+treasury_vault
+:
+platform → PLATFORM_WALLET ATA (fee mint)
+charity → 
+charity_wallet
+ ATA (fee mint) 
+(TGB donation address)
+host → host ATA (if &gt;0)
+Split mode prizes:
+ for each non-zero 
+prize_distribution_bps
+[
+i
+]:
+winner_share
+ = 
+prize_pool
+ * bps / 10_000; transfer to winner’s ATA (fee mint).
+Asset mode prizes:
+ transfer 
+prize_vault
+[
+i
+] balance to 
+winners
+[
+i
+].
+Any dust remainder to charity.
+Effects:
+Set ended = true; status=Ended; emit 
+RoomEnded
+ and per-transfer PayoutExecuted.
+4.5 Cleanup &amp; Recovery
+cleanup_room
+(
+room_id
+)
+After ending, close empty prize vaults, optionally close room PDA after a TTL.
+start_recovery
+(
+room_id
+)
+ (admin)
+Set 
+recovery_started_at_slot
+ = 
+current_slot
+.
+recover_abandoned_room_
+batch
+(
+room_id
+, 
+max_players
+: u16)
+ (admin)
+After threshold (~7 days equivalent in slots):
+For each batch item:
+Refund 
+90%
+ of each player’s 
+total_paid
+ from 
+treasury_vault
+ to player ATA.
+Send 
+10%
+ to PLATFORM_WALLET ATA.
+When no players remain:
+If asset mode, return prize vaults to host.
+Mark ended and status=Ended.
+Emit 
+RecoveryBatchProcessed
+.
+5) What Frontend Sends vs. What Program Calculates
+Frontend → Program (via Anchor clients)
+At room create (pool):
+room_id
+: string
+fee_mint
+: 
+Pubkey
+entry_fee
+: u64
+host_fee_bps
+: u16 (
+0..
+500)
+prize_pool_bps
+: u16 (so host + prize ≤ 4000)
+prize_distribution_bps
+: [u16;3] (sum=10000)
+charity_wallet
+: 
+Pubkey
+ (from backend/TGB)
+charity_memo
+: string (optional)
+At room create (asset):
+Same basics + 
+expected_prizes
+: [(mint: 
+Pubkey
+, amount: u64); up to 3]
+Deposit prize asset (asset mode):
+room_id
+: string, index: 0|1|2
+Join:
+room_id
+: string, 
+extras_amount
+: u64 (program splits entry vs extras; extras semantics are 
+off-chain
+)
+Declare winners:
+room_id
+: string, winners: [Option&lt;
+Pubkey
+&gt;;3]
+End room:
+room_id
+: string (all payout accounts are provided in the accounts list)
+Program → Calculations (on-chain)
+Validations (allowlist, splits, charity minimum, etc.)
+Totals: platform, host, 
+prize_pool
+ (split mode), charity = remainder
+Prize shares per winner (split mode)
+6) Backend — The Giving Block (TGB) Charity Wallet Resolution
+Goal:
+ Before creating a room, resolve a 
+Solana donation address
+ for the chosen charity and the chosen 
+fee asset
+ (e.g., USDC). Store in DB and pass to frontend to include in 
+init_pool_room
+ / 
+init_asset_room
+.
+Suggested flow (pseudo)
+Admin selects charity
+ in 
+FundRaisely
+ (UI).
+Backend calls TGB Public/Partner API to:
+Look up organization by slug/id.
+Initiate or fetch a 
+donation object
+ for 
+Solana USDC
+ (or SOL if you choose 
+wSOL
+).
+Extract 
+deposit address
+ (a Solana address owned by TGB for that org &amp; asset).
+Persist:
+charity_org_id
+, 
+charity_name
+charity_wallet
+ (Solana address)
+fee_asset
+ (e.g., USDC mint)
+Optional 
+charity_memo
+ (e.g., our room id / org ref for reconciliation).
+Provide these to the frontend room creation step. Frontend passes them into the on-chain 
+init
+_*_room instruction.
+Notes:
+Ensure the charity address you get from TGB 
+matches the asset/mint
+ you’ll use for the room. If fee mint = USDC, store the 
+same
+ USDC donation address context.
+For SOL/
+wSOL
+: either use 
+wSOL
+ throughout or keep SOL separate (we recommend 
+wSOL
+ for a single code path).
+Backend responsibilities checklist
+API client for TGB (keys in server env).
+Validate charity supports the fee asset on Solana; otherwise block room creation.
+Provide a small 
+admin UI
+ to fetch/refresh/store TGB addresses per charity &amp; asset.
+Store 
+charity_wallet
+ &amp; 
+charity_memo
+ against the room record.
+(Optional) TGB webhook receiver to reconcile payouts for audit receipts.
+7) Events &amp; Telemetry
+Emit these Anchor events for the socket layer:
+RoomCreated
+ 
+{ 
+room
+_id
+, 
+fee_mint
+, 
+entry_fee
+, 
+mode }
+PrizeAssetDeposited
+ 
+{ 
+room
+_id
+, index, mint, amount, 
+all_
+funded
+ }
+PlayerJoined
+ 
+{ 
+room
+_id
+, player, 
+total_
+paid
+ }
+JoinClosed
+ 
+{ 
+room
+_
+id
+ }
+WinnersDeclared
+ 
+{ 
+room
+_id
+, 
+count }
+RoomEnded
+ 
+{ 
+room
+_id
+, 
+total_pool
+, platform, charity, host, 
+prize_
+pool
+ }
+PayoutExecuted 
+{ 
+room
+_id
+, to, mint, 
+amount }
+RefundIssued
+ 
+{ 
+room
+_id
+, player, 
+amount }
+RecoveryStarted
+ 
+{ 
+room
+_id
+, 
+slot }
+RecoveryBatchProcessed
+ 
+{ 
+room
+_id
+, players, 
+prizes_returned
+, 
+complete }
+RoomClosed
+ 
+{ 
+room
+_
+id
+ }
+8) Security &amp; Invariants
+Program owns vault ATAs; only program can move funds.
+end_room
+ is 
+idempotent
+ via ended flag; re-entry blocked.
+Validations:
+Pool mode: sum(
+prize_distribution_bps
+) == 10000.
+host_fee_bps
+ &lt;= 500.
+host_fee_bps
+ + 
+prize_pool_bps
+ &lt;= 4000.
+Charity remainder 
+≥ 40%
+ of total pool.
+Asset mode: 
+all prizes escrowed
+ before any join allowed.
+Winners: unique, must have joined, and 
+not
+ the host.
+Checked arithmetic on all 
+amounts;
+ abort on overflow.
+9) Testing Plan (high-value cases)
+Pool Room happy path
+Create → Join 
+xN
+ (with/without extras) → Declare winners (1/2/3) → End → Verify transfers:
+20% platform, ≥40% charity, ≤5% host, prize pool distribution sums, dust to charity.
+Asset Room happy path
+Create → Fund all prize vaults → Join 
+xN
+ → Declare winners (3 or fewer) → End → Verify prize vaults drained to winners and fees to platform/charity/host.
+Validation failures
+Bad splits (sum wrong, charity &lt; 40%), winner not a player, winner = host, un-funded asset vaults, non-allowlisted fee mint, join before Ready.
+Recovery
+Start recovery → too early → after threshold: batch refunds 90% to players, 10% platform, return prize assets to host, mark ended.
+Edge amounts
+Tiny dust after integer division; confirm it routes to charity.
+10) Deliverables &amp; Interfaces
+Anchor program
+ repo with:
+idl.json
+Instruction handlers (as above)
+#[account] structs &amp; #[
+derive(
+Accounts)] per instruction
+Events
+Unit tests for math &amp; flows (see §9)
+Backend
+:
+TGB client (get charity donation address for Solana + asset)
+Admin endpoints to store 
+charity_wallet
+ &amp; 
+charity_memo
+Optionally, webhook handler for payout confirmations
+Config
+:
+.env
+ for PLATFORM_WALLET (if not hard-coded) and TGB API keys
+Fee mints allowlist (USDC first)
+11) Frontend Call Map (unchanged names)
+init_pool_room
+(...)
+init_asset_room
+(...)
+deposit_prize_
+asset
+(
+roomId
+, index)
+close_joining
+(
+roomId
+) 
+(optional)
+join_
+room
+(
+roomId
+, 
+extrasAmount
+)
+declare_
+winners
+(
+roomId
+, 
+winners[
+])
+end_room
+(
+roomId
+)
+cleanup_room
+(
+roomId
+)
+Admin: initialize, 
+add_approved_token
+, 
+remove_approved_token
+, pause, 
+unpause
+Admin recovery: 
+start_recovery
+(
+roomId
+), 
+recover_abandoned_room_
+batch
+(
+roomId
+, 
+maxPlayers
+)
+Inputs the FE expects from backend before room creation:
+charity_wallet
+ (Solana address from TGB), 
+charity_memo
+ (string), and chosen 
+fee_mint
+.
+12) Quick Math Reference (bp = /10_000)
+For 
+total_pool
+:
+platform = 
+total_pool
+ * 2000 / 10_000
+host = 
+total_pool
+ * 
+host_fee_bps
+ / 10_000 (
+0..
+500)
+prize_pool
+ = 
+total_pool
+ * 
+prize_pool_bps
+ / 10_000 (Split mode only)
+charity = 
+total_pool
+ - (platform + host + 
+prize_pool
+)
+Assert charity &gt;= 
+total_pool
+ * 4000 / 10_000
+Split mode per-winner:
+winner_i
+ = 
+prize_pool
+ * 
+prize_distribution_bps
+[
+i
+] / 10_000
+Dust remainder → 
+charity

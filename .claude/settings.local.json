@@ -62,7 +62,10 @@
       "Bash(node:*)",
       "Bash(npm run dev)",
       "Bash(jobs:*)",
-      "Bash(start http://localhost:5173)"
+      "Bash(start http://localhost:5173)",
+      "Bash(mkdir:*)",
+      "Bash(python -c \"from docx import Document; doc = Document(''Solana stuff.docx''); print(''\\n''.join([p.text for p in doc.paragraphs]))\")",
+      "Bash(unzip:*)"
     ],
     "deny": [],
     "ask": []

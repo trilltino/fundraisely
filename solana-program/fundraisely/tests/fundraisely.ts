@@ -175,7 +175,8 @@ describe("fundraisely", () => {
       assert.equal(config.charityWallet.toString(), charityWallet.publicKey.toString());
       assert.equal(config.platformFeeBps, 2000); // 20%
       assert.equal(config.maxHostFeeBps, 500); // 5%
-      assert.equal(config.maxCombinedBps, 4000); // 40%
+      assert.equal(config.maxPrizePoolBps, 3500); // 35%
+      assert.equal(config.minCharityBps, 4000); // 40% minimum
       assert.equal(config.emergencyPause, false);
     });
 

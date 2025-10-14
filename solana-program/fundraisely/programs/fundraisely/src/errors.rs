@@ -1,3 +1,84 @@
+//! # Fundraisely Error Codes
+//!
+//! Comprehensive error handling for the Fundraisely smart contract.
+//!
+//! ## Overview
+//!
+//! This module defines all custom error types returned by the Fundraisely program. These errors
+//! provide clear, actionable feedback to frontend applications and users when transactions fail
+//! validation or execution requirements.
+//!
+//! ## Role in Architecture
+//!
+//! Error codes serve multiple critical functions:
+//!
+//! 1. **Transaction Validation**: Pre-execution checks prevent invalid state changes
+//! 2. **Security Enforcement**: Access control and permission validation
+//! 3. **Economic Constraints**: Fee structure and allocation limit enforcement
+//! 4. **Frontend UX**: Clear error messages for user-facing error handling
+//! 5. **Debugging**: Specific error codes help identify issues during development
+//!
+//! ## Frontend Integration
+//!
+//! The `useFundraiselyContract.ts` hook catches these errors and maps them to user-friendly messages:
+//!
+//! ```typescript
+//! try {
+//!   await program.methods.joinRoom(roomId, extras).rpc();
+//! } catch (error) {
+//!   if (error.message.includes("MaxPlayersReached")) {
+//!     showError("Room is full. Please try another room.");
+//!   } else if (error.message.includes("RoomExpired")) {
+//!     showError("This room has expired and is no longer accepting players.");
+//!   }
+//!   // ... additional error mapping
+//! }
+//! ```
+//!
+//! ## Error Categories
+//!
+//! ### Access Control Errors
+//! - `Unauthorized`: Caller lacks permission for requested operation
+//! - `HostCannotBeWinner`: Prevents hosts from awarding themselves prizes
+//!
+//! ### Room State Errors
+//! - `RoomAlreadyExists`, `RoomNotFound`, `RoomNotReady`: Room lifecycle validation
+//! - `RoomAlreadyEnded`, `RoomExpired`: Game completion and timing checks
+//! - `InvalidRoomStatus`: State machine transition validation
+//!
+//! ### Player Participation Errors
+//! - `PlayerAlreadyJoined`: Prevents duplicate entries
+//! - `MaxPlayersReached`: Enforces room capacity limits
+//!
+//! ### Economic Model Errors
+//! - `HostFeeTooHigh`: Enforces 5% maximum host fee
+//! - `PrizePoolTooHigh`: Enforces 35% maximum prize pool
+//! - `CharityBelowMinimum`: Enforces 40% minimum charity allocation
+//! - `InvalidPrizeDistribution`: Ensures prize percentages sum to exactly 100%
+//!
+//! ### Input Validation Errors
+//! - `InvalidEntryFee`: Entry fee must be > 0
+//! - `InvalidWinners`: Winner list validation (1-3 winners, valid pubkeys)
+//! - `InvalidRoomId`: Room ID length constraints (1-32 chars)
+//! - `InvalidMemo`: Charity memo length constraints
+//!
+//! ### Safety Errors
+//! - `ArithmeticOverflow`/`ArithmeticUnderflow`: Checked math safety
+//! - `InsufficientBalance`: Token balance validation
+//! - `EmergencyPause`: Global circuit breaker for security incidents
+//!
+//! ## Economic Model Enforcement
+//!
+//! Several errors specifically protect the economic model's integrity:
+//!
+//! - Charity allocation cannot fall below 40% of entry fees (CharityBelowMinimum)
+//! - Host fees cannot exceed 5% (HostFeeTooHigh)
+//! - Prize pools cannot exceed 35% (PrizePoolTooHigh)
+//! - Combined allocations must not exceed 100% (TotalAllocationTooHigh)
+//!
+//! These constraints are enforced at room creation and cannot be bypassed, ensuring transparent
+//! and trustless charitable fundraising aligned with the platform's mission.
+
 use anchor_lang::prelude::*;
 
 #[error_code]
@@ -73,4 +154,16 @@ pub enum FundraiselyError {
 
     #[msg("Room has reached maximum players")]
     MaxPlayersReached,
+
+    #[msg("Invalid max_players (must be between 1 and 1000)")]
+    InvalidMaxPlayers,
+
+    #[msg("Token account mint does not match room token mint")]
+    InvalidTokenMint,
+
+    #[msg("Token account owner does not match expected winner")]
+    InvalidTokenOwner,
+
+    #[msg("Winners have already been declared for this room")]
+    WinnersAlreadyDeclared,
 }

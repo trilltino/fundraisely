@@ -1,3 +1,71 @@
+/**
+ * SOCKET EVENT HANDLER - Real-Time Game Coordination Logic
+ *
+ * PURPOSE:
+ * This module implements all Socket.io event handlers for the Fundraisely game server.
+ * It orchestrates the complete lifecycle of multiplayer game rooms from creation through
+ * completion, managing player connections, readiness states, and game phase transitions.
+ *
+ * ROLE IN REAL-TIME GAME COORDINATION:
+ * - Registers and processes all client-initiated Socket.io events
+ * - Enforces game rules and state transitions (lobby -> game -> complete)
+ * - Coordinates player synchronization across all connected clients in a room
+ * - Manages connection lifecycle (connect, join, disconnect, reconnect)
+ * - Provides real-time feedback for all game actions via socket emissions
+ *
+ * INTEGRATION WITH FRONTEND & SOLANA PROGRAM:
+ *
+ * Frontend Socket.io Events (Received):
+ *   - create_room: Host creates new game room with Solana contract address
+ *   - join_room: Players join existing room (pre-game lobby)
+ *   - toggle_ready: Players signal readiness to start game
+ *   - start_game: Host initiates game start (triggers frontend Solana transaction)
+ *   - game_over: Host signals game completion (triggers frontend prize distribution)
+ *   - disconnect: Automatic cleanup when player connection drops
+ *
+ * Frontend Socket.io Events (Emitted):
+ *   - room_created: Confirms successful room creation
+ *   - room_update: Real-time room state broadcast to all players
+ *   - game_started: Signals all clients to begin gameplay
+ *   - game_ended: Signals game completion with winner data
+ *   - *_error: Error feedback for failed operations
+ *
+ * Solana Program Coordination:
+ *   - This handler does NOT interact with Solana blockchain directly
+ *   - Room creation includes contractAddress reference for frontend use
+ *   - start_game event triggers frontend to submit "start game" transaction
+ *   - game_over event triggers frontend to submit "distribute prizes" transaction
+ *   - Server validates game state, frontend executes financial transactions
+ *
+ * KEY RESPONSIBILITIES:
+ * 1. Event Registration: Binds all socket events to handler functions
+ * 2. Input Validation: Validates all client data before processing
+ * 3. Rate Limiting: Prevents abuse using RateLimiter for sensitive operations
+ * 4. Room Management: Delegates state changes to RoomManager
+ * 5. Authorization: Ensures only hosts can perform privileged actions
+ * 6. State Broadcasting: Emits room_update to synchronize all clients
+ * 7. Error Handling: Provides descriptive error messages to clients
+ * 8. Cleanup: Removes disconnected players and empty rooms
+ *
+ * DATA FLOW:
+ * 1. Client emits Socket.io event (e.g., create_room)
+ * 2. Handler validates input and checks rate limits
+ * 3. RoomManager updates in-memory state
+ * 4. emitRoomUpdate() broadcasts new state to all room participants
+ * 5. Frontend receives room_update and re-renders UI
+ *
+ * RATE LIMITING PATTERN:
+ * - Uses per-socket, per-action rate limiting via RateLimiter
+ * - create_room: 3 attempts per 60 seconds
+ * - join_room: 5 attempts per 30 seconds
+ * - Prevents spam and abuse without requiring authentication
+ *
+ * ROOM MANAGER INTEGRATION:
+ * - All state mutations delegate to RoomManager methods
+ * - Handler focuses on socket I/O, RoomManager handles game logic
+ * - Clean separation: handler = transport layer, manager = business logic
+ */
+
 // server/handlers/socketHandler.js
 import { RoomManager } from '../managers/RoomManager.js';
 import { RateLimiter } from '../utils/rateLimiter.js';

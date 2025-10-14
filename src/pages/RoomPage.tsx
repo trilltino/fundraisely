@@ -1,3 +1,15 @@
+/**
+ * Live Room Page Component
+ *
+ * Displays and manages real-time multiplayer room state for active fundraising games.
+ * Automatically joins the room via WebSocket when wallet is connected, sending player details
+ * to the backend server. Renders live player list showing host designation, ready status, and
+ * wallet addresses. Provides interactive controls for players to toggle ready state and hosts
+ * to start the game. Integrates useSocket hook for bidirectional communication with the Node.js
+ * server, synchronizing room state across all connected clients. Serves as the waiting lobby
+ * before game start and maintains connection to useFundraiselyContract for on-chain interactions.
+ */
+
 import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWallet } from '@solana/wallet-adapter-react';

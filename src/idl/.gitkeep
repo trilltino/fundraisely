@@ -1,0 +1,15 @@
+# IDL Directory
+
+This directory contains the Anchor IDL (Interface Definition Language) JSON files generated from the Solana program build.
+
+## Usage
+
+After building the Solana program, copy the IDL here:
+
+```bash
+cd solana-program/fundraisely
+anchor build
+cp target/idl/fundraisely.json ../../src/idl/
+```
+
+The IDL is imported by `useFundraiselyContract.ts` to provide type-safe contract interactions.

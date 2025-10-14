@@ -1,3 +1,15 @@
+/**
+ * Room Creation Page Component
+ *
+ * Provides form interface for hosts to configure and create fundraising quiz rooms on Solana.
+ * Captures room parameters including unique room ID, entry fee in SOL, host fee percentage (0-5%),
+ * and prize pool allocation (0-40% total with host fee). Validates wallet connection requirement
+ * and enforces platform fee constraints before blockchain interaction. Integrates with
+ * useFundraiselyContract hook to invoke initPoolRoom instruction on the Solana program.
+ * Currently logs creation parameters pending full smart contract integration. Maintains fee
+ * transparency by displaying platform (20%) and charity calculations to users.
+ */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@solana/wallet-adapter-react';

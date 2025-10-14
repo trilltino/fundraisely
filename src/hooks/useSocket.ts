@@ -1,3 +1,15 @@
+/**
+ * WebSocket Connection Hook
+ *
+ * Manages real-time bidirectional communication with the Node.js backend server for multiplayer
+ * room synchronization. Establishes Socket.io connection with automatic reconnection on disconnect,
+ * and provides methods for room lifecycle: create_room, join_room, toggle_ready, start_game.
+ * Listens for server events (room_update, game_started, number_called) and maintains local
+ * RoomState reflecting current players, host, ready status, and game progress. Used by RoomPage
+ * to display live room state and enable player interactions. Integrates with backend server in
+ * server/ directory and coordinates with useFundraiselyContract for on-chain payment verification.
+ */
+
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 

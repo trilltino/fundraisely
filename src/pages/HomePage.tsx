@@ -1,3 +1,14 @@
+/**
+ * Landing Page Component
+ *
+ * Serves as the main entry point and marketing page for Fundraisely, explaining the platform's
+ * value proposition of blockchain-powered fundraising games with transparent prize distribution.
+ * Provides navigation to CreateRoomPage for hosts to set up quiz rooms with entry fees, and a
+ * placeholder for joining existing rooms. Integrates WalletButton in header for Solana wallet
+ * connection. Features a hero section highlighting key benefits (transparency, speed, fairness)
+ * and showcases the platform's Solana-based architecture for auditable transactions.
+ */
+
 import { Link } from 'react-router-dom';
 import { WalletButton } from '@/components/Wallet/WalletButton';
 
