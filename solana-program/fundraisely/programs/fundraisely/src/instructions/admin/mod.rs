@@ -19,5 +19,9 @@
 //! - **update_admin**: Transfer admin authority
 
 pub mod initialize;
+pub mod initialize_token_registry;
+pub mod add_approved_token;
+pub mod remove_approved_token;
+pub mod recover_room;
 
-pub use initialize::Initialize;
+// Account structs are in lib.rs for Anchor macro compatibility

@@ -18,4 +18,4 @@
 
 pub mod join_room;
 
-pub use join_room::JoinRoom;
+// JoinRoom struct is now in lib.rs for Anchor macro compatibility

@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-fundraisely = "Gd5xJnWthgYEpS39CxWfPPg6G87BEdvDow72uWLuK1Cj"
+fundraisely = "DurTiNFFQK62B5nMimfhuvztJXsFyu8skMz6rNtp2Wmq"
 
 [programs.localnet]
 fundraisely = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"

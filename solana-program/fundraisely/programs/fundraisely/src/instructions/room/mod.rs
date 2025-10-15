@@ -19,4 +19,4 @@
 
 pub mod init_pool_room;
 
-pub use init_pool_room::InitPoolRoom;
+// InitPoolRoom struct is now in lib.rs for Anchor macro compatibility

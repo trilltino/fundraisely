@@ -34,7 +34,7 @@ export interface Player {
   isReady: boolean;
 }
 
-export function useSocket(roomId?: string) {
+export function useSocket(_roomId?: string) { // TODO: Auto-join room on connection
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [roomState, setRoomState] = useState<RoomState | null>(null);

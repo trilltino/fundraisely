@@ -13,7 +13,7 @@
 
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useCallback, useMemo } from 'react';
-import { Program, AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import {
   PublicKey,
   SystemProgram,
@@ -33,10 +33,9 @@ import {
   formatTransactionError,
 } from './transactionHelpers';
 
-// Import IDL - This must be copied after: anchor build && cp target/idl/fundraisely.json src/idl/
-// Temporarily disabled until full IDL is generated
-// @ts-ignore - IDL type mismatch (Anchor generates its own types)
-// import FundraiselyIDL from '@/idl/fundraisely.json';
+// Import IDL - Generated from deployed Solana program
+import FundraiselyIDL from '@/idl/fundraisely.json';
+import type { Idl } from '@coral-xyz/anchor';
 
 // ============================================================================
 // Types - Match Solana program structs exactly
@@ -44,6 +43,7 @@ import {
 
 export interface CreatePoolRoomParams {
   roomId: string; // Human-readable room identifier (max 32 chars)
+  charityWallet: PublicKey; // Charity's Solana wallet address (from TGB or custom)
   entryFee: BN; // Entry fee in token base units (e.g., lamports for SOL)
   maxPlayers: number; // Maximum players allowed (prevents DOS)
   hostFeeBps: number; // Host fee in basis points: 0-500 (0-5%)
@@ -61,6 +61,12 @@ export interface JoinRoomParams {
   hostPubkey: PublicKey; // Room host's pubkey (needed for PDA derivation)
   extrasAmount: BN; // Additional donation beyond entry fee (optional)
   feeTokenMint: PublicKey; // SPL token mint (must match room's mint)
+}
+
+export interface DeclareWinnersParams {
+  roomId: string; // Room identifier
+  hostPubkey: PublicKey; // Room host's pubkey (must match caller)
+  winners: PublicKey[]; // Winner pubkeys (1-3 winners, host cannot be winner)
 }
 
 export interface EndRoomParams {
@@ -120,20 +126,15 @@ export function useFundraiselyContract() {
   }, [connection, publicKey, signTransaction, wallet]);
 
   // Memoize program instance - only recreate when provider changes
-  // TEMPORARILY DISABLED: Program initialization will work after deployment
-  const program = useMemo(() => {
+  const program = useMemo((): Program | null => {
     if (!provider) return null;
 
-    // TODO: Enable after deploying program and generating complete IDL
-    // try {
-    //   return new Program(FundraiselyIDL as Idl, PROGRAM_ID, provider);
-    // } catch (error) {
-    //   console.error('[useFundraiselyContract] Failed to create program:', error);
-    //   return null;
-    // }
-
-    console.warn('[useFundraiselyContract] Program not initialized - deploy contract first');
-    return null;
+    try {
+      return new Program(FundraiselyIDL as Idl, provider);
+    } catch (error) {
+      console.error('[useFundraiselyContract] Failed to create program:', error);
+      return null;
+    }
   }, [provider]);
 
   // ============================================================================
@@ -225,6 +226,7 @@ export function useFundraiselyContract() {
       const ix = await program.methods
         .initPoolRoom(
           params.roomId,
+          params.charityWallet,
           params.entryFee,
           params.maxPlayers,
           params.hostFeeBps,
@@ -258,7 +260,7 @@ export function useFundraiselyContract() {
       // Send and confirm transaction
       const signature = await provider.sendAndConfirm(tx);
 
-      console.log('✅ Room created successfully:', {
+      console.log('Room created successfully:', {
         signature,
         room: room.toBase58(),
         roomId: params.roomId,
@@ -344,7 +346,7 @@ export function useFundraiselyContract() {
       // Send and confirm
       const signature = await provider.sendAndConfirm(tx);
 
-      console.log('✅ Player joined room successfully:', {
+      console.log('Player joined room successfully:', {
         signature,
         player: publicKey.toBase58(),
         room: room.toBase58(),
@@ -353,6 +355,78 @@ export function useFundraiselyContract() {
       return { signature, playerEntry: playerEntry.toBase58() };
     },
     [publicKey, program, provider, connection, deriveGlobalConfigPDA, deriveRoomPDA, deriveRoomVaultPDA, derivePlayerEntryPDA]
+  );
+
+  // ============================================================================
+  // Instruction: Declare Winners
+  // ============================================================================
+
+  const declareWinners = useCallback(
+    async (params: DeclareWinnersParams) => {
+      if (!publicKey || !provider) {
+        throw new Error('Wallet not connected');
+      }
+
+      if (!program) {
+        throw new Error('Program not deployed yet. Run: cd solana-program/fundraisely && anchor deploy');
+      }
+
+      // Validate winners
+      if (params.winners.length < 1 || params.winners.length > 3) {
+        throw new Error('Must declare 1-3 winners');
+      }
+
+      // Derive room PDA
+      const [room] = deriveRoomPDA(params.hostPubkey, params.roomId);
+
+      // Derive PlayerEntry PDAs for each winner (to verify they actually joined)
+      const playerEntryPDAs = params.winners.map(winner => {
+        const [playerEntry] = derivePlayerEntryPDA(room, winner);
+        return playerEntry;
+      });
+
+      console.log('[declareWinners] Declaring winners:', {
+        room: room.toBase58(),
+        winners: params.winners.map(w => w.toBase58()),
+        playerEntries: playerEntryPDAs.map(p => p.toBase58()),
+      });
+
+      // Build instruction with PlayerEntry PDAs as remaining_accounts
+      const ix = await program.methods
+        .declareWinners(params.roomId, params.winners)
+        .accounts({
+          room,
+          host: publicKey,
+        })
+        .remainingAccounts(
+          playerEntryPDAs.map(playerEntry => ({
+            pubkey: playerEntry,
+            isSigner: false,
+            isWritable: false, // Read-only, just verifying they exist
+          }))
+        )
+        .instruction();
+
+      // Build transaction and simulate
+      const tx = new Transaction().add(ix);
+      const simResult = await simulateTransaction(connection, tx);
+
+      if (!simResult.success) {
+        throw new Error(formatTransactionError(simResult.error));
+      }
+
+      // Send and confirm
+      const signature = await provider.sendAndConfirm(tx);
+
+      console.log('Winners declared successfully:', {
+        signature,
+        room: room.toBase58(),
+        winners: params.winners.map(w => w.toBase58()),
+      });
+
+      return { signature };
+    },
+    [publicKey, program, provider, connection, deriveRoomPDA, derivePlayerEntryPDA]
   );
 
   // ============================================================================
@@ -375,6 +449,7 @@ export function useFundraiselyContract() {
       const [roomVault] = deriveRoomVaultPDA(room);
 
       // Fetch global config to get platform and charity wallets
+      // @ts-ignore - Account types available after program deployment
       const globalConfigAccount = await program.account.globalConfig.fetch(globalConfig);
       const platformWallet = globalConfigAccount.platformWallet as PublicKey;
       const charityWallet = globalConfigAccount.charityWallet as PublicKey;
@@ -440,7 +515,7 @@ export function useFundraiselyContract() {
       // Send and confirm
       const signature = await provider.sendAndConfirm(tx);
 
-      console.log('✅ Room ended successfully:', {
+      console.log('Room ended successfully:', {
         signature,
         room: room.toBase58(),
         winners: params.winners.map(w => w.toBase58()),
@@ -463,6 +538,7 @@ export function useFundraiselyContract() {
       if (!program) return null;
 
       try {
+        // @ts-ignore - Account types available after program deployment
         const roomAccount = await program.account.room.fetch(roomPubkey);
 
         return {
@@ -496,6 +572,7 @@ export function useFundraiselyContract() {
       if (!program) return null;
 
       try {
+        // @ts-ignore - Account types available after program deployment
         const entry = await program.account.playerEntry.fetch(playerEntryPubkey);
 
         return {
@@ -525,6 +602,7 @@ export function useFundraiselyContract() {
     // Instructions
     createPoolRoom,
     joinRoom,
+    declareWinners,
     endRoom,
     // Queries
     getRoomInfo,

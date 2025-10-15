@@ -24,10 +24,7 @@ pub mod admin;
 pub mod room;
 pub mod player;
 pub mod game;
+pub mod asset;
 pub mod utils;
 
-// Re-export context structs for lib.rs (avoids need to change lib.rs imports)
-pub use admin::Initialize;
-pub use room::InitPoolRoom;
-pub use player::JoinRoom;
-pub use game::{DeclareWinners, EndRoom};
+// Context structs are now in lib.rs for Anchor macro compatibility

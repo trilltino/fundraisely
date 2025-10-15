@@ -33,7 +33,9 @@ export async function simulateTransaction(
   transaction: Transaction | VersionedTransaction
 ): Promise<SimulationResult> {
   try {
-    const simulation = await connection.simulateTransaction(transaction);
+    const simulation = transaction instanceof Transaction
+      ? await connection.simulateTransaction(transaction)
+      : await connection.simulateTransaction(transaction);
 
     if (simulation.value.err) {
       return {
@@ -61,8 +63,7 @@ export async function simulateTransaction(
  */
 export async function buildAndSimulateTransaction(
   connection: Connection,
-  transaction: Transaction,
-  feePayer: string
+  transaction: Transaction
 ): Promise<{ success: boolean; error?: string; logs?: string[] }> {
   try {
     // Get latest blockhash

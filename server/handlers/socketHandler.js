@@ -234,7 +234,7 @@ export function setupSocketHandlers(io) {
     });
   });
 
-  console.log('✅ Socket handlers initialized');
+  console.log('Socket handlers initialized');
 }
 
 /**

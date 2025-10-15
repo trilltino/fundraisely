@@ -219,7 +219,7 @@
 //!
 //! Successful execution emits:
 //! ```text
-//! ✅ Player joined room
+//! Player joined room
 //!    Player: <player_pubkey>
 //!    Payment: <total_payment> lamports
 //!    Room total: <room.total_collected> lamports
@@ -269,13 +269,13 @@
 //! - **Immutable Receipts**: PlayerEntry PDAs are permanent proof of participation
 
 use anchor_lang::prelude::*;
-use crate::state::{GlobalConfig, Room, RoomStatus, PlayerEntry};
+use crate::state::RoomStatus;
 use crate::errors::FundraiselyError;
 use crate::events::PlayerJoined;
 
 /// Join a room by paying entry fee
 pub fn handler(
-    ctx: Context<JoinRoom>,
+    ctx: Context<crate::JoinRoom>,
     _room_id: String,
     extras_amount: u64,
 ) -> Result<()> {
@@ -360,7 +360,7 @@ pub fn handler(
         room.status = RoomStatus::Active;
     }
 
-    msg!("✅ Player joined room");
+    msg!("Player joined room");
     msg!("   Player: {}", ctx.accounts.player.key());
     msg!("   Payment: {} lamports", total_payment);
     msg!("   Room total: {} lamports", room.total_collected);
@@ -378,41 +378,4 @@ pub fn handler(
     Ok(())
 }
 
-/// Accounts required for join_room instruction
-#[derive(Accounts)]
-#[instruction(room_id: String)]
-pub struct JoinRoom<'info> {
-    #[account(
-        mut,
-        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
-        bump = room.bump,
-    )]
-    pub room: Account<'info, Room>,
-
-    #[account(
-        init,
-        payer = player,
-        space = PlayerEntry::LEN,
-        seeds = [b"player", room.key().as_ref(), player.key().as_ref()],
-        bump
-    )]
-    pub player_entry: Account<'info, PlayerEntry>,
-
-    #[account(mut)]
-    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
-
-    #[account(
-        mut,
-        constraint = player_token_account.mint == room.fee_token_mint,
-    )]
-    pub player_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-
-    #[account(seeds = [b"global-config"], bump = global_config.bump)]
-    pub global_config: Account<'info, GlobalConfig>,
-
-    #[account(mut)]
-    pub player: Signer<'info>,
-
-    pub token_program: Program<'info, anchor_spl::token::Token>,
-    pub system_program: Program<'info, System>,
-}
+// Note: JoinRoom struct moved to lib.rs for Anchor macro compatibility

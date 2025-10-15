@@ -116,6 +116,12 @@ pub enum FundraiselyError {
     #[msg("Token not approved")]
     TokenNotApproved,
 
+    #[msg("Token is already in the approved registry")]
+    TokenAlreadyApproved,
+
+    #[msg("Token registry is full (max 50 tokens)")]
+    TokenRegistryFull,
+
     #[msg("Invalid entry fee")]
     InvalidEntryFee,
 
@@ -166,4 +172,22 @@ pub enum FundraiselyError {
 
     #[msg("Winners have already been declared for this room")]
     WinnersAlreadyDeclared,
+
+    #[msg("Invalid prize amount (must be > 0)")]
+    InvalidPrizeAmount,
+
+    #[msg("Prize already deposited")]
+    PrizeAlreadyDeposited,
+
+    #[msg("Prize not deposited yet")]
+    PrizeNotDeposited,
+
+    #[msg("All prizes must be deposited before players can join")]
+    PrizesNotFullyFunded,
+
+    #[msg("Room cannot be recovered yet (not abandoned)")]
+    RoomNotAbandoned,
+
+    #[msg("Invalid player entry (winner did not join the room)")]
+    InvalidPlayerEntry,
 }

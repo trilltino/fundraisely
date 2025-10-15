@@ -32,7 +32,7 @@
  *
  * Related Files:
  * - lib/queryKeys.ts - Query key factory functions
- * - features/*/api/*.ts - API layer using these queries
+ * - hooks/queries/ - Query hooks using these queries
  * - App.tsx - QueryClientProvider wrapper
  */
 

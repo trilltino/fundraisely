@@ -3,15 +3,14 @@
 //! Finalize room, distribute prizes, and transfer charity donations.
 
 use anchor_lang::prelude::*;
-use anchor_lang::AnchorDeserialize;
-use crate::state::{GlobalConfig, Room, RoomStatus};
+use crate::state::RoomStatus;
 use crate::errors::FundraiselyError;
 use crate::events::RoomEnded;
-use super::utils::calculate_bps;
+use crate::instructions::utils::calculate_bps;
 
 /// End room and distribute prizes to winners
 pub fn handler<'info>(
-    ctx: Context<'_, '_, '_, 'info, EndRoom<'info>>,
+    ctx: Context<'_, '_, '_, 'info, crate::EndRoom<'info>>,
     _room_id: String,
     winners: Vec<Pubkey>,
 ) -> Result<()> {
@@ -210,7 +209,7 @@ pub fn handler<'info>(
         }
     }
 
-    msg!("✅ Room ended and prizes distributed");
+    msg!("Room ended and prizes distributed");
     msg!("   Entry fees: {}, Extras: {} (100% to charity)", entry_fees_total, extras_total);
     msg!("   Platform: {}, Host: {}, Charity: {}, Prizes: {}",
         platform_fee, host_fee, charity_amount, prize_amount);
@@ -230,34 +229,4 @@ pub fn handler<'info>(
     Ok(())
 }
 
-/// Accounts required for end_room instruction
-#[derive(Accounts)]
-#[instruction(room_id: String)]
-pub struct EndRoom<'info> {
-    #[account(
-        mut,
-        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
-        bump = room.bump,
-    )]
-    pub room: Account<'info, Room>,
-
-    #[account(mut)]
-    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
-
-    #[account(seeds = [b"global-config"], bump = global_config.bump)]
-    pub global_config: Account<'info, GlobalConfig>,
-
-    #[account(mut)]
-    pub platform_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-
-    #[account(mut)]
-    pub charity_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-
-    #[account(mut)]
-    pub host_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-
-    #[account(mut)]
-    pub host: Signer<'info>,
-
-    pub token_program: Program<'info, anchor_spl::token::Token>,
-}
+// Note: EndRoom struct moved to lib.rs for Anchor macro compatibility

@@ -93,7 +93,7 @@
 //!
 //! Successful execution emits:
 //! ```text
-//! ✅ Fundraisely program initialized
+//! Fundraisely program initialized
 //!    Admin: <admin_pubkey>
 //!    Platform wallet: <platform_wallet>
 //!    Charity wallet: <charity_wallet>
@@ -106,14 +106,13 @@
 //! - **init_pool_room.rs**: Validates room creation against GlobalConfig constraints
 
 use anchor_lang::prelude::*;
-use crate::state::GlobalConfig;
 
 /// Initialize the global configuration (one-time setup)
 ///
 /// This must be called by the admin before any other operations.
 /// Sets up platform fees, wallets, and economic parameters.
 pub fn handler(
-    ctx: Context<Initialize>,
+    ctx: Context<crate::Initialize>,
     platform_wallet: Pubkey,
     charity_wallet: Pubkey,
 ) -> Result<()> {
@@ -130,7 +129,7 @@ pub fn handler(
     global_config.emergency_pause = false;
     global_config.bump = ctx.bumps.global_config;
 
-    msg!("✅ Fundraisely program initialized");
+    msg!("Fundraisely program initialized");
     msg!("   Admin: {}", ctx.accounts.admin.key());
     msg!("   Platform wallet: {}", platform_wallet);
     msg!("   Charity wallet: {}", charity_wallet);
@@ -138,20 +137,4 @@ pub fn handler(
     Ok(())
 }
 
-/// Accounts required for initialize instruction
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(
-        init,
-        payer = admin,
-        space = GlobalConfig::LEN,
-        seeds = [b"global-config"],
-        bump
-    )]
-    pub global_config: Account<'info, GlobalConfig>,
-
-    #[account(mut)]
-    pub admin: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
+// Note: Initialize struct moved to lib.rs for Anchor macro compatibility

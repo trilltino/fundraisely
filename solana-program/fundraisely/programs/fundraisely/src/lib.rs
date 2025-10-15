@@ -62,35 +62,33 @@ use anchor_lang::prelude::*;
 
 // Module declarations
 pub mod state;
-pub mod instructions;
 pub mod errors;
 pub mod events;
+mod instructions;
 
-// Imports for program module
-use instructions::*;
-use state::*;  // Needed by #[program] macro for account types
-use errors::*; // Needed by #[program] macro for error types
-use events::*; // Needed by emit! macro
+// Re-export all types at crate root so Anchor macros can find them
+pub use state::*;
+pub use errors::*;
+pub use events::*;
 
 // Program ID - will be replaced with actual ID after deployment via `anchor keys sync`
-declare_id!("Gd5xJnWthgYEpS39CxWfPPg6G87BEdvDow72uWLuK1Cj");
+declare_id!("DurTiNFFQK62B5nMimfhuvztJXsFyu8skMz6rNtp2Wmq");
 
 /// Fundraisely Program
 ///
 /// All instruction handlers are implemented in the instructions module.
 /// This keeps lib.rs clean and follows Anchor's recommended project structure.
 #[program]
-pub mod fundraisely {
+mod fundraisely {
     use super::*;
-    use anchor_lang::prelude::*;
 
-    /// Initialize the global configuration (one-time setup)
+    ///Initialize the global configuration (one-time setup)
     pub fn initialize(
         ctx: Context<Initialize>,
         platform_wallet: Pubkey,
         charity_wallet: Pubkey,
     ) -> Result<()> {
-        instructions::admin::initialize::handler(ctx, platform_wallet, charity_wallet)
+        crate::instructions::admin::initialize::handler(ctx, platform_wallet, charity_wallet)
     }
 
     /// Create a pool-based room where prizes come from entry fee pool
@@ -108,7 +106,7 @@ pub mod fundraisely {
         charity_memo: String,
         expiration_slots: Option<u64>,
     ) -> Result<()> {
-        instructions::room::init_pool_room::handler(
+        crate::instructions::room::init_pool_room::handler(
             ctx,
             room_id,
             charity_wallet,
@@ -130,16 +128,16 @@ pub mod fundraisely {
         room_id: String,
         extras_amount: u64,
     ) -> Result<()> {
-        instructions::player::join_room::handler(ctx, room_id, extras_amount)
+        crate::instructions::player::join_room::handler(ctx, room_id, extras_amount)
     }
 
     /// Declare winners for a room (must be called before end_room)
-    pub fn declare_winners(
-        ctx: Context<DeclareWinners>,
+    pub fn declare_winners<'info>(
+        ctx: Context<'_, '_, '_, 'info, DeclareWinners<'info>>,
         room_id: String,
         winners: Vec<Pubkey>,
     ) -> Result<()> {
-        instructions::game::declare_winners::handler(ctx, room_id, winners)
+        crate::instructions::game::declare_winners::handler(ctx, room_id, winners)
     }
 
     /// End room and distribute prizes to winners
@@ -148,6 +146,358 @@ pub mod fundraisely {
         room_id: String,
         winners: Vec<Pubkey>,
     ) -> Result<()> {
-        instructions::game::end_room::handler(ctx, room_id, winners)
+        crate::instructions::game::end_room::handler(ctx, room_id, winners)
     }
+
+    /// Initialize the token registry (one-time setup)
+    pub fn initialize_token_registry(ctx: Context<InitializeTokenRegistry>) -> Result<()> {
+        crate::instructions::admin::initialize_token_registry::handler(ctx)
+    }
+
+    /// Add a token to the approved list
+    pub fn add_approved_token(ctx: Context<AddApprovedToken>, token_mint: Pubkey) -> Result<()> {
+        crate::instructions::admin::add_approved_token::handler(ctx, token_mint)
+    }
+
+    /// Remove a token from the approved list
+    pub fn remove_approved_token(ctx: Context<RemoveApprovedToken>, token_mint: Pubkey) -> Result<()> {
+        crate::instructions::admin::remove_approved_token::handler(ctx, token_mint)
+    }
+
+    /// Initialize asset-based room
+    pub fn init_asset_room(
+        ctx: Context<InitAssetRoom>,
+        room_id: String,
+        charity_wallet: Pubkey,
+        entry_fee: u64,
+        max_players: u32,
+        host_fee_bps: u16,
+        charity_memo: String,
+        expiration_slots: Option<u64>,
+        prize_1_mint: Pubkey,
+        prize_1_amount: u64,
+        prize_2_mint: Option<Pubkey>,
+        prize_2_amount: Option<u64>,
+        prize_3_mint: Option<Pubkey>,
+        prize_3_amount: Option<u64>,
+    ) -> Result<()> {
+        crate::instructions::asset::init_asset_room::handler(
+            ctx,
+            room_id,
+            charity_wallet,
+            entry_fee,
+            max_players,
+            host_fee_bps,
+            charity_memo,
+            expiration_slots,
+            prize_1_mint,
+            prize_1_amount,
+            prize_2_mint,
+            prize_2_amount,
+            prize_3_mint,
+            prize_3_amount,
+        )
+    }
+
+    /// Add prize asset to asset-based room
+    pub fn add_prize_asset(
+        ctx: Context<AddPrizeAsset>,
+        room_id: String,
+        prize_index: u8,
+    ) -> Result<()> {
+        crate::instructions::asset::add_prize_asset::handler(ctx, room_id, prize_index)
+    }
+
+    /// Recover abandoned room (admin only)
+    pub fn recover_room<'info>(
+        ctx: Context<'_, '_, 'info, 'info, RecoverRoom<'info>>,
+        room_id: String,
+    ) -> Result<()> {
+        crate::instructions::admin::recover_room::handler(ctx, room_id)
+    }
+}
+
+// Account structures defined at crate root for Anchor macro compatibility
+// The handlers are in separate modules, but Accounts structs must be here
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(
+        init,
+        payer = admin,
+        space = GlobalConfig::LEN,
+        seeds = [b"global-config"],
+        bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct InitPoolRoom<'info> {
+    #[account(
+        init,
+        payer = host,
+        space = Room::LEN,
+        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
+        bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// CHECK: Room vault PDA will be validated by seeds
+    #[account(
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: AccountInfo<'info>,
+
+    pub fee_token_mint: Account<'info, anchor_spl::token::Mint>,
+
+    #[account(
+        seeds = [b"token-registry"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct JoinRoom<'info> {
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(
+        init,
+        payer = player,
+        space = PlayerEntry::LEN,
+        seeds = [b"player", room.key().as_ref(), player.key().as_ref()],
+        bump
+    )]
+    pub player_entry: Account<'info, PlayerEntry>,
+
+    /// CHECK: Room vault PDA validated by seeds
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub player_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    #[account(mut)]
+    pub player: Signer<'info>,
+
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct DeclareWinners<'info> {
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump,
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(mut)]
+    pub host: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct EndRoom<'info> {
+    #[account(
+        mut,
+        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
+        bump = room.bump,
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(mut)]
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(seeds = [b"global-config"], bump = global_config.bump)]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    #[account(mut)]
+    pub platform_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(mut)]
+    pub charity_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(mut)]
+    pub host_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeTokenRegistry<'info> {
+    #[account(
+        init,
+        payer = admin,
+        space = TokenRegistry::LEN,
+        seeds = [b"token-registry"],
+        bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddApprovedToken<'info> {
+    #[account(
+        mut,
+        seeds = [b"token-registry"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RemoveApprovedToken<'info> {
+    #[account(
+        mut,
+        seeds = [b"token-registry"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct InitAssetRoom<'info> {
+    #[account(
+        init,
+        payer = host,
+        space = Room::LEN,
+        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
+        bump
+    )]
+    pub room: Account<'info, Room>,
+
+    /// CHECK: Room vault PDA
+    #[account(
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: AccountInfo<'info>,
+
+    pub fee_token_mint: Account<'info, anchor_spl::token::Mint>,
+
+    #[account(
+        seeds = [b"token-registry"],
+        bump = token_registry.bump
+    )]
+    pub token_registry: Account<'info, TokenRegistry>,
+
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct AddPrizeAsset<'info> {
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(mut)]
+    pub prize_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(mut)]
+    pub host_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(mut)]
+    pub host: Signer<'info>,
+
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+}
+
+#[derive(Accounts)]
+#[instruction(room_id: String)]
+pub struct RecoverRoom<'info> {
+    #[account(
+        mut,
+        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
+        bump = room.bump
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(
+        mut,
+        seeds = [b"room-vault", room.key().as_ref()],
+        bump
+    )]
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(
+        seeds = [b"global-config"],
+        bump = global_config.bump
+    )]
+    pub global_config: Account<'info, GlobalConfig>,
+
+    #[account(mut)]
+    pub platform_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    pub token_program: Program<'info, anchor_spl::token::Token>,
 }

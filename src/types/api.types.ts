@@ -19,12 +19,10 @@
  * ```
  *
  * Related Files:
- * - features/*/api/*.ts - API client implementations
  * - server/handlers/*.js - Backend handlers using these types
- * - backend-axum/src/handlers/*.rs - Axum handlers using equivalent Rust types
+ * - backend/src/main.rs - TGB backend using equivalent Rust types
  */
 
-import { PublicKey } from '@solana/web3.js';
 import { Room, PlayerEntry } from './program.types';
 
 /**

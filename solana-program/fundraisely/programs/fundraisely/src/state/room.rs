@@ -184,12 +184,23 @@
 
 use anchor_lang::prelude::*;
 
+/// Asset prize information for asset-based rooms
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
+pub struct PrizeAsset {
+    /// Token mint for this prize
+    pub mint: Pubkey,
+    /// Amount of tokens for this prize
+    pub amount: u64,
+    /// Whether this prize has been deposited/escrowed
+    pub deposited: bool,
+}
+
 /// Prize distribution mode
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
 pub enum PrizeMode {
     /// Prizes allocated from percentage of collected entry fees
     PoolSplit,
-    /// Pre-deposited prize assets (future feature)
+    /// Pre-deposited prize assets
     AssetBased,
 }
 
@@ -280,6 +291,10 @@ pub struct Room {
     /// None values indicate no winner declared for that position
     pub winners: [Option<Pubkey>; 3],
 
+    /// Prize assets for asset-based rooms (None for pool-based rooms)
+    /// [1st place, 2nd place, 3rd place]
+    pub prize_assets: [Option<PrizeAsset>; 3],
+
     /// PDA bump seed
     pub bump: u8,
 }
@@ -307,5 +322,6 @@ impl Room {
         8 + // expiration_slot
         (4 + 28) + // charity_memo (String)
         (3 * (1 + 32)) + // winners ([Option<Pubkey>; 3])
+        (3 * (1 + 32 + 8 + 1)) + // prize_assets ([Option<PrizeAsset>; 3])
         1; // bump
 }

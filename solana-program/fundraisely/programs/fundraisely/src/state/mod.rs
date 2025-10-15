@@ -100,7 +100,9 @@
 pub mod global_config;
 pub mod room;
 pub mod player_entry;
+pub mod token_registry;
 
 pub use global_config::*;
 pub use room::*;
 pub use player_entry::*;
+pub use token_registry::*;

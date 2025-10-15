@@ -179,7 +179,7 @@
 //!
 //! Successful execution emits:
 //! ```text
-//! ✅ Pool room created: <room_id>
+//! Pool room created: <room_id>
 //!    Entry fee: <entry_fee> lamports
 //!    Max players: <max_players>
 //!    Host fee: <host_fee_bps>bps, Prize pool: <prize_pool_bps>bps, Charity: <charity_bps>bps
@@ -213,13 +213,13 @@
 //! - **Deterministic Addressing**: Room addresses derived from (host + room_id) prevent collisions
 
 use anchor_lang::prelude::*;
-use crate::state::{GlobalConfig, Room, RoomStatus, PrizeMode};
+use crate::state::{RoomStatus, PrizeMode};
 use crate::errors::FundraiselyError;
 use crate::events::RoomCreated;
 
 /// Create a pool-based room where prizes come from entry fee pool
 pub fn handler(
-    ctx: Context<InitPoolRoom>,
+    ctx: Context<crate::InitPoolRoom>,
     room_id: String,
     charity_wallet: Pubkey,
     entry_fee: u64,
@@ -236,6 +236,12 @@ pub fn handler(
     require!(
         !ctx.accounts.global_config.emergency_pause,
         FundraiselyError::EmergencyPause
+    );
+
+    // Validate token is approved in registry
+    require!(
+        ctx.accounts.token_registry.is_token_approved(&ctx.accounts.fee_token_mint.key()),
+        FundraiselyError::TokenNotApproved
     );
 
     require!(
@@ -309,6 +315,7 @@ pub fn handler(
     room.total_extras_fees = 0;
     room.ended = false;
     room.winners = [None, None, None]; // Winners not yet declared
+    room.prize_assets = [None, None, None]; // No asset prizes for pool-based rooms
 
     let current_slot = Clock::get()?.slot;
     room.creation_slot = current_slot;
@@ -323,7 +330,7 @@ pub fn handler(
     room.charity_memo = charity_memo;
     room.bump = ctx.bumps.room;
 
-    msg!("✅ Pool room created: {}", room_id);
+    msg!("Pool room created: {}", room_id);
     msg!("   Entry fee: {} lamports", entry_fee);
     msg!("   Max players: {}", max_players);
     msg!("   Host fee: {}bps, Prize pool: {}bps, Charity: {}bps",
@@ -343,38 +350,4 @@ pub fn handler(
     Ok(())
 }
 
-/// Accounts required for init_pool_room instruction
-#[derive(Accounts)]
-#[instruction(room_id: String)]
-pub struct InitPoolRoom<'info> {
-    #[account(
-        init,
-        payer = host,
-        space = Room::LEN,
-        seeds = [b"room", host.key().as_ref(), room_id.as_bytes()],
-        bump
-    )]
-    pub room: Account<'info, Room>,
-
-    #[account(
-        init,
-        payer = host,
-        token::mint = fee_token_mint,
-        token::authority = room,
-        seeds = [b"room-vault", room.key().as_ref()],
-        bump
-    )]
-    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
-
-    pub fee_token_mint: Account<'info, anchor_spl::token::Mint>,
-
-    #[account(seeds = [b"global-config"], bump = global_config.bump)]
-    pub global_config: Account<'info, GlobalConfig>,
-
-    #[account(mut)]
-    pub host: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, anchor_spl::token::Token>,
-    pub rent: Sysvar<'info, Rent>,
-}
+// Note: InitPoolRoom struct moved to lib.rs for Anchor macro compatibility

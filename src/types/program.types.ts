@@ -191,3 +191,12 @@ export interface EndRoomParams {
   roomId: string;
   winners: PublicKey[];
 }
+
+/**
+ * Room filters for querying
+ */
+export interface RoomFilters {
+  status?: RoomStatus;
+  host?: PublicKey;
+  ended?: boolean;
+}

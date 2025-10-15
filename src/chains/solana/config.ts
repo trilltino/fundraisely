@@ -12,9 +12,9 @@
 
 import { PublicKey } from '@solana/web3.js';
 
-// Program IDs - Updated after anchor build
+// Program IDs - Updated after anchor deploy
 export const PROGRAM_ID = new PublicKey(
-  import.meta.env.VITE_PROGRAM_ID || 'Gd5xJnWthgYEpS39CxWfPPg6G87BEdvDow72uWLuK1Cj'
+  import.meta.env.VITE_PROGRAM_ID || 'DurTiNFFQK62B5nMimfhuvztJXsFyu8skMz6rNtp2Wmq'
 );
 
 // Network configuration
@@ -33,11 +33,12 @@ export const TOKEN_MINTS = {
   SOL: new PublicKey('So11111111111111111111111111111111111111112'), // Wrapped SOL
 };
 
-// PDA seeds (must match program)
+// PDA seeds (must match program - using underscores as per Rust code)
 export const PDA_SEEDS = {
   GLOBAL_CONFIG: 'global-config',
-  APPROVED_TOKENS: 'approved-tokens',
+  APPROVED_TOKENS: 'approved_tokens',
   ROOM: 'room',
+  ROOM_VAULT: 'room-vault',
   PLAYER: 'player',
 };
 

@@ -50,8 +50,8 @@
 //! ```text
 //! - All declared winners must be unique pubkeys
 //! - Cannot declare same player as multiple winners
-//! - Example INVALID: [Alice, Alice, Bob] ❌
-//! - Example VALID: [Alice, Bob, Charlie] ✅
+//! - Example INVALID: [Alice, Alice, Bob]
+//! - Example VALID: [Alice, Bob, Charlie]
 //! ```
 //!
 //! ### Host Exclusion
@@ -152,7 +152,7 @@
 //!
 //! Successful execution emits:
 //! ```text
-//! ✅ Winners declared for room
+//! Winners declared for room
 //!    Winner 1: <winner1_pubkey>
 //!    Winner 2: <winner2_pubkey> (if present)
 //!    Winner 3: <winner3_pubkey> (if present)
@@ -210,16 +210,16 @@
 //! 5. **Automatic Declaration**: AI/oracle could declare winners based on on-chain game state
 
 use anchor_lang::prelude::*;
-use crate::state::{Room, RoomStatus};
+use crate::state::RoomStatus;
 use crate::errors::FundraiselyError;
 use crate::events::WinnersDeclared;
 
 /// Declare winners for a room
 ///
 /// Host-only instruction to officially declare 1-3 winners before fund distribution.
-/// Winners are validated for uniqueness and host exclusion.
-pub fn handler(
-    ctx: Context<DeclareWinners>,
+/// Winners are validated for uniqueness, host exclusion, and actual room participation.
+pub fn handler<'info>(
+    ctx: Context<'_, '_, '_, 'info, crate::DeclareWinners<'info>>,
     _room_id: String,
     winners: Vec<Pubkey>,
 ) -> Result<()> {
@@ -255,7 +255,7 @@ pub fn handler(
         FundraiselyError::InvalidWinners
     );
 
-    // Validation: Winners must be unique
+    // Validation: Winners must be unique (no duplicates)
     for i in 0..winners.len() {
         for j in (i+1)..winners.len() {
             require!(
@@ -273,6 +273,49 @@ pub fn handler(
         );
     }
 
+    // NEW VALIDATION: Winners must have actually joined the room
+    // Verify that remaining_accounts contains valid PlayerEntry PDAs for each winner
+    require!(
+        ctx.remaining_accounts.len() >= winners.len(),
+        FundraiselyError::InvalidWinners
+    );
+
+    for (i, winner) in winners.iter().enumerate() {
+        // Derive the expected PlayerEntry PDA for this winner
+        // Seeds: ["player", room_pubkey, player_pubkey] - must match join_room.rs
+        let (expected_player_entry_pda, _bump) = Pubkey::find_program_address(
+            &[
+                b"player",
+                room.key().as_ref(),
+                winner.as_ref(),
+            ],
+            ctx.program_id,
+        );
+
+        // Get the passed-in PlayerEntry account from remaining_accounts
+        let player_entry_account = &ctx.remaining_accounts[i];
+
+        // Validation: The account address must match the derived PDA
+        require!(
+            player_entry_account.key() == expected_player_entry_pda,
+            FundraiselyError::InvalidPlayerEntry
+        );
+
+        // Validation: The account must exist (have data and be initialized)
+        require!(
+            !player_entry_account.data_is_empty(),
+            FundraiselyError::InvalidPlayerEntry
+        );
+
+        // Validation: The account must be owned by this program
+        require!(
+            player_entry_account.owner == ctx.program_id,
+            FundraiselyError::InvalidPlayerEntry
+        );
+
+        msg!("   Winner {} verified: {} (PlayerEntry exists)", i + 1, winner);
+    }
+
     // Store winners in room (pad with None for unfilled positions)
     for (i, winner) in winners.iter().enumerate() {
         if i < 3 {
@@ -280,7 +323,7 @@ pub fn handler(
         }
     }
 
-    msg!("✅ Winners declared for room");
+    msg!("Winners declared for room");
     for (i, winner_opt) in room.winners.iter().enumerate() {
         if let Some(winner) = winner_opt {
             msg!("   Winner {}: {}", i + 1, winner);
@@ -297,17 +340,4 @@ pub fn handler(
     Ok(())
 }
 
-/// Accounts required for declare_winners instruction
-#[derive(Accounts)]
-#[instruction(room_id: String)]
-pub struct DeclareWinners<'info> {
-    #[account(
-        mut,
-        seeds = [b"room", room.host.as_ref(), room_id.as_bytes()],
-        bump = room.bump,
-    )]
-    pub room: Account<'info, Room>,
-
-    #[account(mut)]
-    pub host: Signer<'info>,
-}
+// Note: DeclareWinners struct moved to lib.rs for Anchor macro compatibility
