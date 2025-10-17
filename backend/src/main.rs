@@ -6,173 +6,65 @@
 //! we keep the TGB API key secure (not exposed in frontend) and can add additional business logic
 //! like caching, rate limiting, or logging in the future.
 //!
-//! The server runs on port 3001 and exposes three endpoints:
+//! The server runs on port 3002 and exposes three endpoints:
 //! - GET /api/charities?q=search_term - Search for charities by name via TGB API
 //! - GET /api/charities/:id/address/:token - Get donation address for charity+token combination
 //! - GET /health - Simple health check endpoint
 //!
 //! This backend is required for the charity selection feature in room creation to work properly.
+//!
+//! # Architecture
+//! The application is organized into modules following Rust best practices:
+//! - `config` - Environment variable loading and validation
+//! - `models` - Data structures for API requests/responses
+//! - `services` - Business logic and external API clients
+//! - `handlers` - HTTP request handlers
+//! - `routes` - Router configuration
+//! - `middleware` - HTTP middleware (CORS, etc.)
 
-use axum::{
-    extract::{Path, Query},
-    http::StatusCode,
-    response::Json,
-    routing::get,
-    Router,
-};
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, error};
+use std::sync::Arc;
+use tracing::info;
+
+// Module declarations
+mod config;
+mod handlers;
+mod middleware;
+mod models;
+mod routes;
+mod services;
+
+use config::{load_env, validate_env, get_tgb_api_key};
+use services::TgbClient;
 
 #[tokio::main]
 async fn main() {
-    // Load environment variables
-    dotenvy::dotenv().ok();
+    // Load environment variables from .env file
+    load_env();
 
-    // Initialize tracing
+    // Initialize tracing for structured logging
     tracing_subscriber::fmt::init();
 
-    // Validate TGB API key exists
-    let _api_key = std::env::var("TGB_API_KEY")
-        .expect("TGB_API_KEY must be set in .env file");
+    // Validate all required configuration
+    validate_env();
 
     info!("Starting Fundraisely Backend Server...");
 
-    // Build router
-    let app = Router::new()
-        .route("/api/charities", get(search_charities))
-        .route("/api/charities/{id}/address/{token}", get(get_charity_address))
-        .route("/health", get(health_check))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
-        );
+    // Create TGB API client (shared across all requests)
+    let api_key = get_tgb_api_key();
+    let tgb_client = Arc::new(TgbClient::new(api_key));
+
+    // Build router with all routes and middleware
+    let app = routes::build_router(tgb_client);
 
     // Run server on port 3002 (port 3001 is used by WebSocket server)
     let addr = SocketAddr::from(([127, 0, 0, 1], 3002));
     info!("TGB Backend Server listening on http://{}", addr);
+    info!("Health check available at http://{}/health", addr);
+    info!("API endpoints:");
+    info!("  - GET /api/charities?q=<search_term>");
+    info!("  - GET /api/charities/<id>/address/<token>");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-/// Health check endpoint
-async fn health_check() -> &'static str {
-    "OK"
-}
-
-/// Search query parameters
-#[derive(Deserialize)]
-struct SearchQuery {
-    q: String,
-}
-
-/// Charity data structure (simplified)
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct Charity {
-    id: String,
-    name: String,
-    description: Option<String>,
-    logo_url: Option<String>,
-    categories: Vec<String>,
-}
-
-/// Search charities by name
-async fn search_charities(
-    Query(params): Query<SearchQuery>,
-) -> Result<Json<Vec<Charity>>, StatusCode> {
-    let api_key = std::env::var("TGB_API_KEY").unwrap();
-
-    info!("Searching charities: query={}", params.q);
-
-    // Call The Giving Block API
-    let client = reqwest::Client::new();
-    let response = client
-        .get("https://api.thegivingblock.com/v1/charities/search")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .query(&[("q", params.q)])
-        .send()
-        .await;
-
-    match response {
-        Ok(res) => {
-            if res.status().is_success() {
-                match res.json::<Vec<Charity>>().await {
-                    Ok(charities) => {
-                        info!("Found {} charities", charities.len());
-                        Ok(Json(charities))
-                    }
-                    Err(e) => {
-                        error!("Failed to parse TGB response: {}", e);
-                        Err(StatusCode::INTERNAL_SERVER_ERROR)
-                    }
-                }
-            } else {
-                error!("TGB API returned error: {}", res.status());
-                Err(StatusCode::BAD_GATEWAY)
-            }
-        }
-        Err(e) => {
-            error!("Failed to call TGB API: {}", e);
-            Err(StatusCode::SERVICE_UNAVAILABLE)
-        }
-    }
-}
-
-/// Donation address response
-#[derive(Serialize, Deserialize, Debug)]
-struct DonationAddress {
-    charity_id: String,
-    token: String,
-    address: String,
-    network: String,
-}
-
-/// Get donation address for charity and token
-async fn get_charity_address(
-    Path((charity_id, token)): Path<(String, String)>,
-) -> Result<Json<DonationAddress>, StatusCode> {
-    let api_key = std::env::var("TGB_API_KEY").unwrap();
-
-    info!("Getting address: charity_id={}, token={}", charity_id, token);
-
-    // Call The Giving Block API
-    let client = reqwest::Client::new();
-    let url = format!(
-        "https://api.thegivingblock.com/v1/charities/{}/address/{}",
-        charity_id, token
-    );
-
-    let response = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .send()
-        .await;
-
-    match response {
-        Ok(res) => {
-            if res.status().is_success() {
-                match res.json::<DonationAddress>().await {
-                    Ok(address) => {
-                        info!("Got address: {}", address.address);
-                        Ok(Json(address))
-                    }
-                    Err(e) => {
-                        error!("Failed to parse TGB response: {}", e);
-                        Err(StatusCode::INTERNAL_SERVER_ERROR)
-                    }
-                }
-            } else {
-                error!("TGB API returned error: {}", res.status());
-                Err(StatusCode::BAD_GATEWAY)
-            }
-        }
-        Err(e) => {
-            error!("Failed to call TGB API: {}", e);
-            Err(StatusCode::SERVICE_UNAVAILABLE)
-        }
-    }
 }

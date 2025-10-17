@@ -84,7 +84,7 @@ export async function buildAndSimulateTransaction(
       };
     }
 
-    console.log('✅ Transaction simulation succeeded');
+    console.log('[COMPLETE] Transaction simulation succeeded');
     console.log(`Units consumed: ${result.unitsConsumed}`);
 
     return { success: true };

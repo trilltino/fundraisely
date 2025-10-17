@@ -1425,6 +1425,11 @@
       "code": 6034,
       "name": "RoomNotAbandoned",
       "msg": "Room cannot be recovered yet (not abandoned)"
+    },
+    {
+      "code": 6035,
+      "name": "InvalidPlayerEntry",
+      "msg": "Invalid player entry (winner did not join the room)"
     }
   ],
   "types": [

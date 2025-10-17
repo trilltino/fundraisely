@@ -90,7 +90,19 @@
       "Bash(start https://explorer.solana.com/address/DurTiNFFQK62B5nMimfhuvztJXsFyu8skMz6rNtp2Wmq?cluster=devnet)",
       "Bash(timeout 120 npx tsc --noEmit)",
       "Bash(start \"\" \"c:\\Users\\isich\\fundraisely\\SOLANA_CONTRACT_REQUIREMENTS.html\")",
-      "Bash(copy:*)"
+      "Bash(copy:*)",
+      "Bash(start http://localhost:5173/BingoBlitz)",
+      "Bash(npx tsx:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout 3 node:*)",
+      "Bash(tasklist:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(timeout:*)",
+      "Bash(wc:*)",
+      "Bash(where cargo:*)",
+      "Bash(start http://localhost:5176)"
     ],
     "deny": [],
     "ask": []

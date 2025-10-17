@@ -61,31 +61,54 @@ const httpServer = createServer(app);
 // Socket.io configuration
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow all localhost origins for development
+      if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
   transports: ['websocket', 'polling'],
 });
 
-// Set up socket event handlers
-setupSocketHandlers(io);
+// Set up socket event handlers and get roomManager instance
+const roomManager = setupSocketHandlers(io);
+
+// Periodic cleanup of old rooms (every 1 hour)
+// Removes completed games and stale rooms to prevent memory leaks
+setInterval(() => {
+  const deletedCount = roomManager.cleanupOldRooms();
+  if (deletedCount > 0) {
+    console.log(` Periodic cleanup: removed ${deletedCount} old rooms`);
+  }
+}, 60 * 60 * 1000); // 1 hour
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    connections: io.engine.clientsCount
+    connections: io.engine.clientsCount,
+    activeRooms: roomManager.getRoomCount(),
   });
 });
 
 // Stats endpoint
 app.get('/api/stats', (req, res) => {
-  const roomManager = req.app.get('roomManager');
   res.json({
-    totalRooms: roomManager?.getRoomCount() || 0,
+    totalRooms: roomManager.getRoomCount(),
     activeConnections: io.engine.clientsCount,
+    rooms: roomManager.getAllRooms().map(r => ({
+      roomId: r.roomId,
+      playerCount: r.playerCount,
+      gameStarted: r.gameStarted,
+      gameOver: r.gameOver,
+      createdAt: r.createdAt,
+    })),
   });
 });
 

@@ -68,9 +68,11 @@
 
 // server/handlers/socketHandler.js
 import { RoomManager } from '../managers/RoomManager.js';
+import { GameManager } from '../managers/GameManager.js';
 import { RateLimiter } from '../utils/rateLimiter.js';
 
 const roomManager = new RoomManager();
+const gameManager = new GameManager();
 const rateLimiter = new RateLimiter();
 
 /**
@@ -78,7 +80,7 @@ const rateLimiter = new RateLimiter();
  */
 export function setupSocketHandlers(io) {
   io.on('connection', (socket) => {
-    console.log(`🔌 Client connected: ${socket.id}`);
+    console.log(` Client connected: ${socket.id}`);
 
     // Handle room creation
     socket.on('create_room', (data) => {
@@ -192,11 +194,57 @@ export function setupSocketHandlers(io) {
         }
 
         roomManager.startGame(roomId);
+
+        // Initialize game state
+        gameManager.initializeGame(roomId);
+
         io.to(roomId).emit('game_started', { roomId });
         emitRoomUpdate(io, roomId);
       } catch (error) {
         console.error('Start game error:', error);
         socket.emit('error', { message: error.message });
+      }
+    });
+
+    // Handle manual number call
+    socket.on('call_number', ({ roomId }) => {
+      try {
+        const result = gameManager.callNumber(roomId);
+        io.to(roomId).emit('number_called', result);
+      } catch (error) {
+        console.error('Call number error:', error);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    // Handle toggle auto-play
+    socket.on('toggle_auto_play', ({ roomId }) => {
+      try {
+        const autoPlay = gameManager.toggleAutoPlay(roomId, io);
+        io.to(roomId).emit('auto_play_update', { autoPlay });
+      } catch (error) {
+        console.error('Toggle auto-play error:', error);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    // Handle pause game
+    socket.on('pause_game', ({ roomId }) => {
+      try {
+        gameManager.pauseGame(roomId);
+        io.to(roomId).emit('game_paused', { roomId });
+      } catch (error) {
+        console.error('Pause game error:', error);
+      }
+    });
+
+    // Handle unpause game
+    socket.on('unpause_game', ({ roomId }) => {
+      try {
+        gameManager.unpauseGame(roomId);
+        io.to(roomId).emit('game_unpaused', { roomId });
+      } catch (error) {
+        console.error('Unpause game error:', error);
       }
     });
 
@@ -213,6 +261,7 @@ export function setupSocketHandlers(io) {
         }
 
         roomManager.endGame(roomId, winners);
+        gameManager.endGame(roomId); // Cleanup game state
         io.to(roomId).emit('game_ended', { roomId, winners });
         emitRoomUpdate(io, roomId);
       } catch (error) {
@@ -220,9 +269,44 @@ export function setupSocketHandlers(io) {
       }
     });
 
+    // Handle room verification
+    socket.on('verify_room_exists', ({ roomId }) => {
+      try {
+        console.log(`🔍 Verifying room: ${roomId}`);
+        const room = roomManager.getRoom(roomId);
+        console.log(`📦 Room found:`, room ? 'YES' : 'NO');
+
+        if (room) {
+          console.log(`✅ Room ${roomId} exists - sending verification result`);
+          socket.emit('room_verification_result', {
+            roomId,
+            exists: true,
+            chainId: room.chainId || 0,
+            contractAddress: room.contractAddress || 'solana',
+            namespace: room.namespace || 'solana',
+            entryFee: room.entryFee || '0',
+          });
+        } else {
+          console.log(`❌ Room ${roomId} NOT found`);
+          const allRooms = roomManager.getAllRooms();
+          console.log(`📋 Active rooms (${allRooms.length}):`, allRooms.map(r => r.roomId));
+          socket.emit('room_verification_result', {
+            roomId,
+            exists: false,
+          });
+        }
+      } catch (error) {
+        console.error('Room verification error:', error);
+        socket.emit('room_verification_result', {
+          roomId,
+          exists: false,
+        });
+      }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
-      console.log(`❌ Client disconnected: ${socket.id}`);
+      console.log(`[ERROR] Client disconnected: ${socket.id}`);
 
       // Remove player from all rooms
       for (const room of roomManager.getAllRooms()) {
@@ -235,6 +319,9 @@ export function setupSocketHandlers(io) {
   });
 
   console.log('Socket handlers initialized');
+
+  // Return roomManager instance for external access (cleanup, stats, etc.)
+  return roomManager;
 }
 
 /**

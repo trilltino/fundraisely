@@ -205,7 +205,7 @@ export class TransactionBuilder {
       )
     }
 
-    console.log('✅ Transaction simulation succeeded')
+    console.log('[COMPLETE] Transaction simulation succeeded')
     if (simulation.value.logs) {
       console.log('Program logs:', simulation.value.logs.join('\n'))
     }
@@ -248,12 +248,12 @@ export class TransactionBuilder {
           }
         )
 
-        console.log(`✅ Transaction sent: ${signature}`)
+        console.log(`[COMPLETE] Transaction sent: ${signature}`)
         return signature
       } catch (error: any) {
         lastError = error
         console.warn(
-          `❌ Transaction send attempt ${attempt + 1} failed:`,
+          `[ERROR] Transaction send attempt ${attempt + 1} failed:`,
           error.message
         )
 
@@ -308,7 +308,7 @@ export class TransactionBuilder {
       )
     }
 
-    console.log(`✅ Transaction confirmed: ${signature}`)
+    console.log(`[COMPLETE] Transaction confirmed: ${signature}`)
   }
 }
 

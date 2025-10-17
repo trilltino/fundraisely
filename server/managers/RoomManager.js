@@ -152,7 +152,7 @@ export class RoomManager {
     });
 
     room.playerCount = room.players.size;
-    console.log(`👤 Player ${playerData.wallet} joined room ${roomId}`);
+    console.log(` Player ${playerData.wallet} joined room ${roomId}`);
     return room;
   }
 
@@ -167,14 +167,21 @@ export class RoomManager {
     if (player) {
       room.players.delete(socketId);
       room.playerCount = room.players.size;
-      console.log(`👋 Player ${player.wallet} left room ${roomId}`);
+      console.log(` Player ${player.wallet} left room ${roomId}`);
     }
 
-    // Clean up empty rooms
-    if (room.players.size === 0) {
-      this.rooms.delete(roomId);
-      console.log(`🗑️  Room ${roomId} deleted (empty)`);
-    }
+    // DON'T delete empty rooms - they may be waiting for players to join!
+    // Rooms should only be deleted when:
+    // 1. Game has ended (gameOver === true)
+    // 2. Room has expired (TTL check)
+    // 3. Host explicitly deletes it
+    //
+    // This allows:
+    // - Host to create room and navigate away without losing it
+    // - Players to join rooms that exist on Solana blockchain
+    // - Proper room persistence for the multiplayer experience
+    //
+    // Note: In production, implement TTL cleanup to prevent memory leaks
   }
 
   /**
@@ -212,7 +219,7 @@ export class RoomManager {
     }
 
     room.gameStarted = true;
-    console.log(`🎮 Game started in room ${roomId}`);
+    console.log(`[GAME] Game started in room ${roomId}`);
     return room;
   }
 
@@ -227,8 +234,57 @@ export class RoomManager {
 
     room.gameOver = true;
     room.winners = winners;
-    console.log(`🏆 Game ended in room ${roomId}`);
+    room.endedAt = Date.now();
+    console.log(`[WINNER] Game ended in room ${roomId}`);
     return room;
+  }
+
+  /**
+   * Delete a specific room (e.g., after game ends or host cancels)
+   */
+  deleteRoom(roomId) {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      this.rooms.delete(roomId);
+      console.log(`️  Room ${roomId} deleted`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Clean up old rooms (TTL-based cleanup)
+   * Should be called periodically to prevent memory leaks
+   *
+   * @param {number} maxAgeMs - Maximum age in milliseconds (default: 24 hours)
+   */
+  cleanupOldRooms(maxAgeMs = 24 * 60 * 60 * 1000) {
+    const now = Date.now();
+    let deletedCount = 0;
+
+    for (const [roomId, room] of this.rooms.entries()) {
+      const age = now - room.createdAt;
+
+      // Delete if:
+      // 1. Game ended more than 1 hour ago
+      if (room.gameOver && room.endedAt && (now - room.endedAt) > 60 * 60 * 1000) {
+        this.rooms.delete(roomId);
+        deletedCount++;
+        console.log(`️  Deleted completed room ${roomId} (ended ${Math.round((now - room.endedAt) / 1000 / 60)} minutes ago)`);
+      }
+      // 2. Room never started and is older than maxAge
+      else if (!room.gameStarted && age > maxAgeMs) {
+        this.rooms.delete(roomId);
+        deletedCount++;
+        console.log(`️  Deleted stale room ${roomId} (created ${Math.round(age / 1000 / 60 / 60)} hours ago)`);
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(` Cleanup: Removed ${deletedCount} old rooms`);
+    }
+
+    return deletedCount;
   }
 
   /**
