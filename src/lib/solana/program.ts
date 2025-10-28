@@ -1,4 +1,130 @@
-// Fundraisely Program Integration Helpers
+/**
+ * Fundraisely Solana Program Integration Helpers
+ *
+ * **Purpose:**
+ * Provides high-level wrapper functions for interacting with the Fundraisely Solana smart contract.
+ * Abstracts complex PDA derivation, account preparation, and transaction construction into simple
+ * async functions. Serves as the primary integration layer between frontend React code and the
+ * deployed Anchor program.
+ *
+ * **Core Operations:**
+ * 1. **PDA Derivation**: Deterministic address generation for Room, RoomVault, PlayerEntry, etc.
+ * 2. **Room Management**: Create pool-based fundraising rooms
+ * 3. **Player Actions**: Join rooms by paying entry fees
+ * 4. **Prize Distribution**: End rooms and atomically distribute funds to winners
+ * 5. **Admin Functions**: Token registry management, global config updates
+ * 6. **Query Functions**: Fetch on-chain room data, check token approvals
+ *
+ * **PDA (Program Derived Address) Hierarchy:**
+ * ```
+ * Program: DurTiNFFQK62B5nMimfhuvztJXsFyu8skMz6rNtp2Wmq
+ * │
+ * ├─ GlobalConfig PDA
+ * │   └─ Seeds: ["global_config"]
+ * │   └─ Stores: platform_wallet, platform_fee_bps
+ * │
+ * ├─ TokenRegistry PDA
+ * │   └─ Seeds: ["token_registry"]
+ * │   └─ Stores: approved_tokens[] (allowlist of SPL tokens)
+ * │
+ * ├─ Room PDA (per game)
+ * │   └─ Seeds: ["room", host_pubkey, room_id]
+ * │   └─ Stores: entry_fee, max_players, prize_distribution, status
+ * │   │
+ * │   ├─ RoomVault PDA (token escrow)
+ * │   │   └─ Seeds: ["room_vault", room_pda]
+ * │   │   └─ Holds: All entry fees + extras until distribution
+ * │   │
+ * │   └─ PlayerEntry PDA[] (per player)
+ * │       └─ Seeds: ["player", room_pda, player_pubkey]
+ * │       └─ Stores: entry_paid, extras_paid, total_paid
+ * ```
+ *
+ * **Integration with Frontend:**
+ * - Used by: `useFundraiselyContract.ts` (React hook wrapper)
+ * - Called from: Room creation flows, join flows, prize distribution
+ * - Returns: Transaction signatures, PDA addresses, account data
+ *
+ * **Integration with Solana Program:**
+ * - Calls: Deployed Fundraisely Anchor program
+ * - Uses: IDL from `@/idl/fundraisely.json` (auto-generated from Rust code)
+ * - Network: Configurable (devnet/mainnet-beta via RPC endpoint)
+ *
+ * **Transaction Flow:**
+ * 1. **Room Creation (Host):**
+ *    - Derive Room PDA + RoomVault PDA
+ *    - Call `init_pool_room` instruction
+ *    - Result: Room account created, vault initialized
+ *
+ * 2. **Player Join:**
+ *    - Derive PlayerEntry PDA
+ *    - Fetch room to get token mint
+ *    - Get player's Associated Token Account (ATA)
+ *    - Call `join_room` instruction
+ *    - Result: Entry fee transferred to vault, PlayerEntry created
+ *
+ * 3. **Prize Distribution (Host):**
+ *    - Fetch room + global config
+ *    - Derive all token accounts (platform, charity, host, winners)
+ *    - Call `end_room` instruction
+ *    - Result: Vault funds distributed to all parties atomically
+ *
+ * **Error Handling:**
+ * All functions may throw Anchor/Solana errors:
+ * - `InsufficientFunds`: Player doesn't have enough tokens
+ * - `RoomFull`: Max players reached
+ * - `RoomNotActive`: Room already ended or not started
+ * - `Unauthorized`: Only host can end room
+ * - Account errors: PDA not found, invalid signer, etc.
+ *
+ * **Type Conversions:**
+ * - BigInt ↔ BN (Anchor BigNumber): `toBN()`, `lamportsToSol()`, `solToLamports()`
+ * - PublicKey ↔ string: `new PublicKey(string)`, `publicKey.toBase58()`
+ * - Token amounts: Always in base units (lamports for SOL, smallest unit for SPL)
+ *
+ * **Usage Example:**
+ * ```typescript
+ * import { createPoolRoom, joinRoom, endRoom } from '@/lib/solana/program';
+ * import { AnchorProvider } from '@coral-xyz/anchor';
+ * import { PublicKey } from '@solana/web3.js';
+ *
+ * // Create a room (host)
+ * const { signature, roomPDA } = await createPoolRoom(provider, {
+ *   roomId: 'my-bingo-room',
+ *   charityWallet: new PublicKey('Char1ty...'),
+ *   entryFee: BigInt(5_000_000), // 0.005 SOL
+ *   maxPlayers: 50,
+ *   hostFeeBps: 300, // 3%
+ *   prizePoolBps: 2000, // 20%
+ *   firstPlacePct: 60,
+ *   secondPlacePct: 30,
+ *   thirdPlacePct: 10,
+ *   charityMemo: 'Bingo for Good',
+ *   expirationSlots: BigInt(43200), // ~24 hours
+ * });
+ *
+ * // Join as player
+ * const { signature: joinSig } = await joinRoom(provider, hostPubkey, {
+ *   roomId: 'my-bingo-room',
+ *   extrasAmount: BigInt(1_000_000), // Optional extra donation
+ * });
+ *
+ * // Distribute prizes (host)
+ * const { signature: endSig } = await endRoom(provider, {
+ *   roomId: 'my-bingo-room',
+ *   winners: [winner1Pubkey, winner2Pubkey, winner3Pubkey],
+ * });
+ * ```
+ *
+ * **Future Enhancements:**
+ * - Add `declareWinners()` wrapper for new two-step distribution
+ * - Add `simulateTransaction()` for pre-flight checks
+ * - Add `estimateFees()` for gas estimation
+ * - Add `cancelRoom()` for refunds if room doesn't fill
+ *
+ * @module lib/solana/program
+ * @category Blockchain Integration
+ */
 import { AnchorProvider, Program, Idl } from '@coral-xyz/anchor';
 import { Connection, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, NATIVE_MINT } from '@solana/spl-token';

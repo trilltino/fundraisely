@@ -86,6 +86,8 @@ export interface Player {
   paid: boolean;
   paymentMethod: 'cash' | 'revolut' | 'web3' | 'unknown';
   credits: number;
+  isReady?: boolean;
+  isHost?: boolean;
   extras?: string[];
   extraPayments?: {
     [extraKey: string]: {

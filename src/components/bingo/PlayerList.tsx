@@ -131,7 +131,7 @@
 
 import { Crown, User, CheckCircle2, Circle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { Player } from '../types/game';
+import type { Player } from '@/types/game';
 
 interface PlayerListProps {
   players: Player[];
@@ -141,17 +141,28 @@ interface PlayerListProps {
   gameStarted: boolean;
 }
 
-export function PlayerList({ 
-  players, 
-  currentPlayerId, 
+export function PlayerList({
+  players,
+  currentPlayerId,
   onToggleReady,
   onStartGame,
-  gameStarted 
+  gameStarted
 }: PlayerListProps) {
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const allPlayersReady = players.every(p => p.isReady);
   const readyCount = players.filter(p => p.isReady).length;
-  const isSinglePlayer = players.length === 1; // <-- We need this!
+  const isSinglePlayer = players.length === 1;
+
+  console.log('[PlayerList] State:', {
+    playersCount: players.length,
+    currentPlayerId,
+    currentPlayerFound: !!currentPlayer,
+    currentPlayerIsHost: currentPlayer?.isHost,
+    isSinglePlayer,
+    allPlayersReady,
+    gameStarted,
+    players: players.map(p => ({ id: p.id, name: p.name, isHost: p.isHost, isReady: p.isReady }))
+  });
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-6">

@@ -102,7 +102,17 @@
       "Bash(timeout:*)",
       "Bash(wc:*)",
       "Bash(where cargo:*)",
-      "Bash(start http://localhost:5176)"
+      "Bash(start http://localhost:5176)",
+      "Bash(npx vite build:*)",
+      "Bash(npx vite)",
+      "Bash(start http://localhost:5174)",
+      "Bash(dir:*)",
+      "Bash(/dev/null)",
+      "Bash(start http://localhost:5175/quiz)",
+      "Bash(start http://localhost:5173/quiz)",
+      "Bash(git pull:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(where solana-test-validator)"
     ],
     "deny": [],
     "ask": []

@@ -1,3 +1,117 @@
+/**
+ * Player List Panel - Player Registration and QR Code Sharing
+ *
+ * **Purpose:** Sub-panel of HostDashboard showing registered players with payment status,
+ * QR code generation for easy mobile joining, and manual player addition for Web2 rooms.
+ *
+ * **Key Features:**
+ * 1. **Manual Player Addition** (Web2 only): Host can add players without blockchain
+ * 2. **Payment Status Display**: Shows paid/unpaid status for each player
+ * 3. **QR Code Generation**: Per-player join links with embedded playerId
+ * 4. **Socket Sync**: Automatically emits player list to server when updated
+ * 5. **Payment Method Tracking**: Records how each player paid (cash/revolut/web3)
+ *
+ * **Web2 vs. Web3 Behavior:**
+ *
+ * **Web2 (cash/revolut):**
+ * - **Manual add enabled**: Host fills name + payment method → Click "Add" button
+ * - **Player ID**: Generated client-side with `nanoid()` (8-character unique ID)
+ * - **Payment tracking**: Host manually marks paid in PaymentReconciliationPanel
+ * - **Join flow**: Players can join via QR code with pre-assigned playerId
+ *
+ * **Web3 (blockchain):**
+ * - **Manual add disabled**: Players must join via blockchain transaction
+ * - **Player list read-only**: Shows players who joined on-chain
+ * - **Payment verification**: Automatic via smart contract event listening
+ * - **Join flow**: Players connect wallet → Pay entry fee → Auto-added to list
+ *
+ * **QR Code Join Links:**
+ * Each player gets a unique join URL with embedded playerId:
+ * ```
+ * Format: {origin}/join/{roomId}?playerId={playerId}
+ * Example: https://fundraisely.com/join/abc123?playerId=xyz789
+ * ```
+ *
+ * **Why Embedded PlayerId:**
+ * - **Pre-registered**: Player already in host's list before joining socket
+ * - **Payment tracking**: Host knows who player is for payment reconciliation
+ * - **Skip name entry**: Player doesn't re-enter name (host already added it)
+ * - **Host control**: Host decides who can join (vs. open registration)
+ *
+ * **Player Addition Flow (Web2):**
+ * ```
+ * Host enters name "Alice" + selects "Cash"
+ *   ↓
+ * Click "Add" → addPlayer() called
+ *   ↓
+ * Player object created: { id: nanoid(), name: "Alice", paid: false, paymentMethod: "cash", credits: 0 }
+ *   ↓
+ * Saved to usePlayerStore (Zustand) + localStorage
+ *   ↓
+ * useEffect triggers → emitPlayersUpdate()
+ *   ↓
+ * Verify room exists → socket.emit('add_player', { roomId, players })
+ *   ↓
+ * Server updates room.players array
+ * ```
+ *
+ * **Socket Sync Strategy:**
+ * `emitPlayersUpdate()` fires whenever players array changes:
+ * 1. Verify room exists (prevent sending to deleted rooms)
+ * 2. Emit `add_player` event with full players array
+ * 3. Server replaces its players list with this array (full sync, not append)
+ *
+ * **Why Full Sync Instead of Incremental:**
+ * - **Simpler**: No need to track add/remove/update separately
+ * - **Resilience**: Recovers from missed events (server always has latest full state)
+ * - **Consistency**: Client is source of truth for player list (host controls)
+ *
+ * **QR Code UI:**
+ * - Click "📝 Invite" button → Toggle QR code visibility for that player
+ * - QR code displays: 128x128 canvas with join URL
+ * - Shows URL text below QR code (for manual copy)
+ * - "Copy Link" button → Copies URL to clipboard
+ *
+ * **Payment Method Options:**
+ * - **cash**: Physical cash payment (offline)
+ * - **revolut**: Revolut mobile payment (offline verification)
+ * - **web3**: Blockchain payment (on-chain verification)
+ * - **unknown**: Payment method not specified (default fallback)
+ *
+ * **Player List Display:**
+ * For each player shows:
+ * - **Name**: Player's display name
+ * - **Payment method**: How they paid (cash/revolut/web3/unknown)
+ * - **Status**: "[COMPLETE] Paid" or "[ERROR] Unpaid"
+ * - **Actions**: "Mark Paid" toggle (Web2 only), "📝 Invite" (QR code)
+ *
+ * **State Management:**
+ * - Local: `newName`, `paymentMethod`, `selectedPlayerId` (controlled inputs)
+ * - Global: `usePlayerStore.players` (Zustand store)
+ * - Persistence: `localStorage.players_{roomId}` (saved by usePlayerStore)
+ *
+ * **Integration:**
+ * - Parent: HostDashboard
+ * - State: usePlayerStore (player list), useQuizConfig (payment method check)
+ * - WebSocket: useQuizSocket → emit 'add_player', 'verify_quiz_room'
+ * - Related: PaymentReconciliationPanel (payment status toggle)
+ *
+ * **Validation:**
+ * - Cannot add player without name (trimmed name must be non-empty)
+ * - Cannot add player without roomId (should never happen, defensive check)
+ * - Room verification before socket emit (prevents orphaned events)
+ *
+ * **Future Enhancements:**
+ * - Bulk player import (CSV upload)
+ * - Player removal (currently can only add)
+ * - SMS/email invite directly from dashboard
+ * - Player profile pictures
+ * - Pre-registration form (players submit name before host approves)
+ *
+ * @component
+ * @category Quiz Dashboard
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { usePlayerStore } from '../../../stores/quizPlayerStore';
@@ -97,11 +211,20 @@ const PlayerListPanel: React.FC = () => {
 
             return (
               <li key={player.id} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <p className="font-medium text-gray-800">{player.name}</p>
-                  <p className="text-sm text-gray-500">
-                    Payment: {player.paymentMethod} | Status: {player.paid ? '[COMPLETE] Paid' : '[ERROR] Unpaid'}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    {player.isReady ? (
+                      <span className="text-green-500 text-xl">✓</span>
+                    ) : (
+                      <span className="text-gray-300 text-xl">○</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800">{player.name}</p>
+                    <p className="text-sm text-gray-500">
+                      Payment: {player.paymentMethod} | Status: {player.paid ? 'Paid' : 'Unpaid'} | {player.isReady ? 'Ready' : 'Not Ready'}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2 items-center">
                   {!isWeb3 && (

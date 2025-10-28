@@ -14,11 +14,11 @@
  * - Offers clean escape route back to main site for unauthorized users
  *
  * SECURITY MODEL:
- * - Requires 5-digit PIN for access (currently hardcoded as '12345')
+ * - Requires PIN for access (configured via VITE_PITCH_DECK_PIN environment variable)
  * - Authorization status persisted to localStorage as 'pitchDeckAuthorized'
  * - Once authorized, user can access pitch deck until they clear browser data
  * - PIN submission clears input on incorrect attempt
- * - TODO: PIN should be moved to environment variable for production
+ * - Default PIN: '1234' (should be changed in production via environment variable)
  *
  * UI STATES:
  * 1. Unauthorized State (Default):
@@ -96,28 +96,31 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Home } from 'lucide-react';
 
+// Load PIN from environment variable (defaults to '1234' if not set)
+const CORRECT_PIN = import.meta.env.VITE_PITCH_DECK_PIN || '1234';
+
 export function PitchDeck() {
   const [authorized, setAuthorized] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  
+
   // Check if user is already authorized (from localStorage)
   useEffect(() => {
     const isAuthorized = localStorage.getItem('pitchDeckAuthorized') === 'true';
     setAuthorized(isAuthorized);
   }, []);
-  
+
   const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPin(e.target.value);
     if (error) setError('');
   };
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check if the PIN is correct (replace '12345' with your desired PIN)
-    if (pin === '12345') {
+
+    // Check if the PIN is correct
+    if (pin === CORRECT_PIN) {
       setAuthorized(true);
       localStorage.setItem('pitchDeckAuthorized', 'true');
     } else {

@@ -190,4 +190,10 @@ pub enum FundraiselyError {
 
     #[msg("Invalid player entry (winner did not join the room)")]
     InvalidPlayerEntry,
+
+    #[msg("Invalid vault account (must be a valid TokenAccount)")]
+    InvalidVaultAccount,
+
+    #[msg("Invalid vault authority (vault must be owned by room PDA)")]
+    InvalidVaultAuthority,
 }

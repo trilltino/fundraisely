@@ -1,14 +1,71 @@
+/**
+ * Host Game Controls - Quiz Execution Command Center
+ *
+ * **Purpose:** Real-time quiz control panel for hosts to run the live quiz. Manages question
+ * progression, round transitions, timer display, and quiz termination. Coordinates with server
+ * via WebSocket to synchronize all players.
+ *
+ * **Key Features:**
+ * 1. **Question Control**: Advance to next question, timer countdown
+ * 2. **Round Management**: Start next round, track progress
+ * 3. **Player Tracking**: Live player count display
+ * 4. **Phase Indicators**: Visual status (waiting/in_question/reviewing/complete)
+ * 5. **Quiz Termination**: End quiz and trigger prize distribution
+ *
+ * **Game Flow:**
+ * ```
+ * Host clicks "Next Question"
+ *   ↓
+ * socket.emit('start_next_question', { roomId })
+ *   ↓
+ * Server generates question → Emits 'question' event to all
+ *   ↓
+ * Host receives 'question' → Display question + start timer
+ *   ↓
+ * Players see question on their screens
+ *   ↓
+ * Timer counts down (host & players see countdown)
+ *   ↓
+ * Time expires → Host reveals answer (manual or auto)
+ *   ↓
+ * If last question of round → "Start Next Round" button enabled
+ *   ↓
+ * Host clicks "Start Next Round"
+ *   ↓
+ * Repeat for next round...
+ *   ↓
+ * After final round → Host clicks "End Quiz"
+ *   ↓
+ * Server calculates winners → Prize distribution
+ * ```
+ *
+ * **Socket Events:** emit 'start_next_question', 'start_next_round', 'end_quiz'
+ * **Socket Events Received:** 'room_config', 'question', 'quiz_end', 'player_joined'
+ *
+ * **Phase Lifecycle:** 'waiting' → 'in_question' → 'reviewing' → 'complete'
+ *
+ * **Integration:**
+ * - Parent: HostDashboard (5th panel)
+ * - WebSocket: useQuizSocket
+ * - Related: Player game screens (receive same events)
+ *
+ * @component
+ * @category Quiz Dashboard
+ */
+
 //src/quiz/game/GameControls.tsx
 
 import { useParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useQuizSocket } from '../useQuizSocket';
+import { usePlayerStore } from '../../../stores/quizPlayerStore';
 
 const debug = true;
 
 const HostGameControls = () => {
   const { roomId } = useParams();
   const socket = useQuizSocket();
+  const { players } = usePlayerStore();
 
   const [round, setRound] = useState(1);
   const [question, setQuestion] = useState(0);
@@ -19,6 +76,7 @@ const HostGameControls = () => {
   const [canStartNextQuestion, setCanStartNextQuestion] = useState(true);
   const [canStartNextRound, setCanStartNextRound] = useState(false);
   const [quizEnded, setQuizEnded] = useState(false);
+  const [quizStarted, setQuizStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [phase, setPhase] = useState<'waiting' | 'in_question' | 'reviewing' | 'complete'>('waiting');
@@ -157,6 +215,21 @@ const HostGameControls = () => {
     socket.emit('start_next_round', { roomId });
   };
 
+  const handleStartQuiz = () => {
+    if (!socket || !roomId) return;
+
+    const allReady = players.every(p => p.isReady || p.isHost);
+    if (!allReady) {
+      alert('Not all players are ready! Please wait for all players to click "Ready Up".');
+      return;
+    }
+
+    if (debug) console.log('[Host] Starting quiz', { roomId });
+    socket.emit('quiz_started', { roomId });
+    setQuizStarted(true);
+    setStatus('Quiz started! Click "Next Question" to begin.');
+  };
+
   const handleEndQuiz = () => {
     if (!socket || !roomId) return;
     if (debug) console.log('[Host] [ERROR] Emitting end_quiz', { roomId });
@@ -185,6 +258,18 @@ const HostGameControls = () => {
           <p> Round: {round} / {totalRounds}</p>
           <p> Question: {question} / {questionsPerRound}</p>
           <p> Total Players: {totalPlayers}</p>
+          {!quizStarted && (
+            <p className="flex items-center gap-2">
+              Ready Status:
+              <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                players.every(p => p.isReady || p.isHost)
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {players.filter(p => p.isReady || p.isHost).length} / {players.length} Ready
+              </span>
+            </p>
+          )}
           <p className="flex items-center gap-2">
              Phase: <span className={`text-white text-xs font-semibold px-2 py-1 rounded ${phaseColor}`}>{phase.replace('_', ' ').toUpperCase()}</span>
           </p>
@@ -211,17 +296,28 @@ const HostGameControls = () => {
         )}
 
         <div className="grid grid-cols-1 gap-3 mt-4">
-          <button
-            onClick={handleNextQuestion}
-            className={`px-4 py-2 rounded-xl w-full transition text-white font-semibold shadow ${
-              canStartNextQuestion 
-                ? 'bg-indigo-600 hover:bg-indigo-700' 
-                : 'bg-gray-400 cursor-not-allowed'
-            }`}
-            disabled={!canStartNextQuestion || quizEnded}
-          >
-            ▶️ Next Question
-          </button>
+          {!quizStarted && (
+            <button
+              onClick={handleStartQuiz}
+              className="px-4 py-2 rounded-xl w-full transition text-white font-semibold shadow bg-green-600 hover:bg-green-700"
+            >
+              Start Quiz
+            </button>
+          )}
+
+          {quizStarted && (
+            <button
+              onClick={handleNextQuestion}
+              className={`px-4 py-2 rounded-xl w-full transition text-white font-semibold shadow ${
+                canStartNextQuestion
+                  ? 'bg-indigo-600 hover:bg-indigo-700'
+                  : 'bg-gray-400 cursor-not-allowed'
+              }`}
+              disabled={!canStartNextQuestion || quizEnded}
+            >
+              ▶️ Next Question
+            </button>
+          )}
 
           <button
             onClick={handleNextRound}

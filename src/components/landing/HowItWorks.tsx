@@ -1,3 +1,13 @@
+/**
+ * How It Works Section - 3-Step Process Overview
+ *
+ * **Purpose:** Simplifies platform into 3 steps: Register & Verify,
+ * Configure Events, Run & Report. Reduces perceived complexity.
+ *
+ * @component
+ * @category Landing Page
+ */
+
 import type React from 'react';
 
 const HowItWorks: React.FC = () => {

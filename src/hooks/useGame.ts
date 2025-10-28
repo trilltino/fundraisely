@@ -135,7 +135,7 @@
  * - useEffect cleanup runs when socket instance changes or component unmounts
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { generateBingoCard, checkWin } from '../utils/gameLogic';
 import type { WinResult } from '../utils/gameLogic';
 import type { GameState } from '../types/game';
@@ -155,7 +155,26 @@ interface AutoPlayPayload {
   autoPlay: boolean;
 }
 
-export function useGame(socket: Socket | null, roomId: string) {
+/**
+ * Return type for useGame hook
+ */
+interface UseGameReturn {
+  gameState: GameState;
+  autoPlay: boolean;
+  handleCellClick: (index: number) => void;
+  callNumber: () => void;
+  startNewGame: () => void;
+  toggleAutoPlay: () => void;
+  unpauseGame: () => void;
+}
+
+/**
+ * Custom hook for managing Bingo game state and interactions
+ * @param socket - Socket.io client instance
+ * @param roomId - Current game room ID
+ * @returns Game state and interaction handlers
+ */
+export function useGame(socket: Socket | null, roomId: string): UseGameReturn {
   const [gameState, setGameState] = useState<GameState>(() => {
     const numbers = generateBingoCard();
     return {
@@ -181,15 +200,19 @@ export function useGame(socket: Socket | null, roomId: string) {
     socket: storeSocket,
   } = useGameStore();
 
-  useEffect(() => {
-    setGameState((prev) => ({
-      ...prev,
+  // ✅ OPTIMIZED: Use useMemo instead of useEffect for derived state
+  // (from React docs: "You Might Not Need an Effect")
+  // This avoids unnecessary state updates and re-renders
+  const derivedGameState = useMemo(
+    () => ({
+      ...gameState,
       calledNumbers: storeCalledNumbers,
       currentNumber: storeCurrentNumber,
       hasWonLine: lineWinners.some((w) => w.id === storeSocket?.id),
       hasWonFullHouse: fullHouseWinners.some((w) => w.id === storeSocket?.id),
-    }));
-  }, [storeCalledNumbers, storeCurrentNumber, lineWinners, fullHouseWinners, storeSocket]);
+    }),
+    [gameState, storeCalledNumbers, storeCurrentNumber, lineWinners, fullHouseWinners, storeSocket]
+  );
 
   useEffect(() => {
     if (socket && gameState.card) {
@@ -197,11 +220,15 @@ export function useGame(socket: Socket | null, roomId: string) {
     }
   }, [socket, gameState.card, roomId]);
 
+  // ✅ OPTIMIZED: Removed gameState.hasWonFullHouse from dependencies
+  // Use derivedGameState instead to avoid unnecessary callback re-creations
   const handleCellClick = useCallback(
     (index: number) => {
-      if (gameState.hasWonFullHouse || isPaused) return;
+      if (isPaused) return;
 
       setGameState((prev) => {
+        // Check hasWonFullHouse from prev state (current state at time of click)
+        if (prev.hasWonFullHouse) return prev;
         if (!prev.calledNumbers.includes(prev.card[index].number)) return prev;
 
         const newCard = [...prev.card];
@@ -226,7 +253,7 @@ export function useGame(socket: Socket | null, roomId: string) {
         return newState;
       });
     },
-    [gameState.hasWonFullHouse, lineWinClaimed, socket, roomId, setHasWonLine, setHasWonFullHouse, isPaused]
+    [lineWinClaimed, socket, roomId, setHasWonLine, setHasWonFullHouse, isPaused]
   );
 
   const unpauseGame = useCallback(() => {
@@ -313,7 +340,7 @@ export function useGame(socket: Socket | null, roomId: string) {
   }, [socket, setAutoPlay]);
 
   return {
-    gameState,
+    gameState: derivedGameState,
     autoPlay,
     handleCellClick,
     callNumber,

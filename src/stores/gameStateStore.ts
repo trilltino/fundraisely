@@ -18,6 +18,31 @@
  * - Separate from player and UI concerns
  * - Type-safe winner tracking
  * - Computed selectors for common queries
+ * - **Immer middleware for immutable updates** (prevents accidental mutations)
+ *
+ * **IMMER INTEGRATION:**
+ * This store uses Zustand's immer middleware to enable mutable-style updates
+ * while maintaining immutability under the hood. This pattern:
+ * 1. Simplifies complex nested state updates (no manual spreading)
+ * 2. Prevents accidental mutations (Immer freezes draft objects in dev mode)
+ * 3. Improves performance (Immer uses structural sharing)
+ * 4. Follows Zustand best practices (recommended in official docs)
+ *
+ * **Before (manual immutability):**
+ * ```typescript
+ * set({
+ *   calledNumbers: [...get().calledNumbers, number],
+ *   currentNumber: number,
+ * });
+ * ```
+ *
+ * **After (Immer draft mutations):**
+ * ```typescript
+ * set((state) => {
+ *   state.calledNumbers.push(number); // Looks mutable, but Immer makes it immutable!
+ *   state.currentNumber = number;
+ * });
+ * ```
  *
  * USAGE:
  * ```typescript
@@ -40,6 +65,7 @@
  */
 
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 
 export interface Winner {
   id: string;
@@ -109,106 +135,135 @@ const createInitialState = () => ({
   paymentsFinalized: false,
 });
 
-export const useGameStateStore = create<GameStateStore>()((set, get) => ({
-  ...createInitialState(),
+export const useGameStateStore = create<GameStateStore>()(
+  immer((set, get) => ({
+    ...createInitialState(),
 
-  // Set game started
-  setGameStarted: (gameStarted) => {
-    if (get().gameStarted !== gameStarted) {
-      set({ gameStarted });
-    }
-  },
-
-  // Set paused state
-  setIsPaused: (isPaused) => {
-    if (get().isPaused !== isPaused) {
-      set({ isPaused });
-    }
-  },
-
-  // Set auto-play mode
-  setAutoPlay: (autoPlay) => {
-    if (get().autoPlay !== autoPlay) {
-      set({ autoPlay });
-    }
-  },
-
-  // Set current number
-  setCurrentNumber: (currentNumber) => {
-    if (get().currentNumber !== currentNumber) {
-      set({ currentNumber });
-    }
-  },
-
-  // Set all called numbers
-  setCalledNumbers: (calledNumbers) => {
-    set({ calledNumbers });
-  },
-
-  // Add a single called number
-  addCalledNumber: (number) => {
-    const { calledNumbers } = get();
-    if (!calledNumbers.includes(number)) {
-      set({
-        calledNumbers: [...calledNumbers, number],
-        currentNumber: number,
+    // Set game started
+    // With Immer: Direct property assignment, Immer handles immutability
+    setGameStarted: (gameStarted) => {
+      set((state) => {
+        if (state.gameStarted !== gameStarted) {
+          state.gameStarted = gameStarted;
+        }
       });
-    }
-  },
+    },
 
-  // Set line winners
-  setLineWinners: (lineWinners) => {
-    set({ lineWinners });
-  },
+    // Set paused state
+    setIsPaused: (isPaused) => {
+      set((state) => {
+        if (state.isPaused !== isPaused) {
+          state.isPaused = isPaused;
+        }
+      });
+    },
 
-  // Set full house winners
-  setFullHouseWinners: (fullHouseWinners) => {
-    set({ fullHouseWinners });
-  },
+    // Set auto-play mode
+    setAutoPlay: (autoPlay) => {
+      set((state) => {
+        if (state.autoPlay !== autoPlay) {
+          state.autoPlay = autoPlay;
+        }
+      });
+    },
 
-  // Set line win claimed
-  setLineWinClaimed: (lineWinClaimed) => {
-    if (get().lineWinClaimed !== lineWinClaimed) {
-      set({ lineWinClaimed });
-    }
-  },
+    // Set current number
+    setCurrentNumber: (currentNumber) => {
+      set((state) => {
+        if (state.currentNumber !== currentNumber) {
+          state.currentNumber = currentNumber;
+        }
+      });
+    },
 
-  // Set current player's line win
-  setHasWonLine: (hasWonLine) => {
-    if (get().hasWonLine !== hasWonLine) {
-      set({ hasWonLine });
-    }
-  },
+    // Set all called numbers
+    setCalledNumbers: (calledNumbers) => {
+      set((state) => {
+        state.calledNumbers = calledNumbers;
+      });
+    },
 
-  // Set current player's full house win
-  setHasWonFullHouse: (hasWonFullHouse) => {
-    if (get().hasWonFullHouse !== hasWonFullHouse) {
-      set({ hasWonFullHouse });
-    }
-  },
+    // Add a single called number
+    // With Immer: Use array.push() instead of spreading [...arr, item]
+    addCalledNumber: (number) => {
+      set((state) => {
+        if (!state.calledNumbers.includes(number)) {
+          state.calledNumbers.push(number); // Immer makes this immutable!
+          state.currentNumber = number;
+        }
+      });
+    },
 
-  // Set payments finalized
-  setPaymentsFinalized: (paymentsFinalized) => {
-    if (get().paymentsFinalized !== paymentsFinalized) {
-      set({ paymentsFinalized });
-    }
-  },
+    // Set line winners
+    setLineWinners: (lineWinners) => {
+      set((state) => {
+        state.lineWinners = lineWinners;
+      });
+    },
 
-  // Reset to initial state
-  resetGameState: () => {
-    set(createInitialState());
-  },
+    // Set full house winners
+    setFullHouseWinners: (fullHouseWinners) => {
+      set((state) => {
+        state.fullHouseWinners = fullHouseWinners;
+      });
+    },
 
-  // Check if number was called
-  isNumberCalled: (number) => {
-    return get().calledNumbers.includes(number);
-  },
+    // Set line win claimed
+    setLineWinClaimed: (lineWinClaimed) => {
+      set((state) => {
+        if (state.lineWinClaimed !== lineWinClaimed) {
+          state.lineWinClaimed = lineWinClaimed;
+        }
+      });
+    },
 
-  // Check if there's any winner
-  hasWinner: () => {
-    const { lineWinners, fullHouseWinners } = get();
-    return lineWinners.length > 0 || fullHouseWinners.length > 0;
-  },
-}));
+    // Set current player's line win
+    setHasWonLine: (hasWonLine) => {
+      set((state) => {
+        if (state.hasWonLine !== hasWonLine) {
+          state.hasWonLine = hasWonLine;
+        }
+      });
+    },
+
+    // Set current player's full house win
+    setHasWonFullHouse: (hasWonFullHouse) => {
+      set((state) => {
+        if (state.hasWonFullHouse !== hasWonFullHouse) {
+          state.hasWonFullHouse = hasWonFullHouse;
+        }
+      });
+    },
+
+    // Set payments finalized
+    setPaymentsFinalized: (paymentsFinalized) => {
+      set((state) => {
+        if (state.paymentsFinalized !== paymentsFinalized) {
+          state.paymentsFinalized = paymentsFinalized;
+        }
+      });
+    },
+
+    // Reset to initial state
+    // With Immer: Assign all properties from initial state
+    resetGameState: () => {
+      set((state) => {
+        const initial = createInitialState();
+        Object.assign(state, initial);
+      });
+    },
+
+    // Check if number was called
+    isNumberCalled: (number) => {
+      return get().calledNumbers.includes(number);
+    },
+
+    // Check if there's any winner
+    hasWinner: () => {
+      const state = get();
+      return state.lineWinners.length > 0 || state.fullHouseWinners.length > 0;
+    },
+  }))
+);
 
 export default useGameStateStore;

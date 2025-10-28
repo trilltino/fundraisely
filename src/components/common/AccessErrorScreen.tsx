@@ -2,7 +2,7 @@
 import type React from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { GameAccessAlert } from './GameAccessAlert';
+import { GameAccessAlert } from '@/components/bingo/alerts/GameAccessAlert';
 
 interface AccessErrorScreenProps {
   showAccessError: boolean;

@@ -1,3 +1,31 @@
+/**
+ * Simple Header - Mobile-Friendly Navigation with Smooth Scroll
+ *
+ * **Purpose:** Alternative header used on TestCampaign page. Features mobile hamburger menu,
+ * smooth scroll to page sections, and responsive desktop/mobile navigation.
+ *
+ * **Navigation Links:**
+ * - Home: Routes to /
+ * - About This Campaign: Scrolls to #about-campaign
+ * - For Hosts: Scrolls to #for-hosts
+ * - For Players: Scrolls to #for-players
+ * - About Fundraisely: Scrolls to #about-fundraisely
+ * - Pitch Deck: Routes to /pitch-deck
+ *
+ * **Mobile Features:**
+ * - Hamburger menu (X icon when open)
+ * - Collapsible menu with smooth animations
+ * - Auto-close after clicking link
+ *
+ * **Smooth Scroll:**
+ * - Accounts for fixed header height (72px offset)
+ * - Uses `window.scrollTo({ behavior: 'smooth' })`
+ * - Prevents content from hiding behind fixed header
+ *
+ * @component
+ * @category Layout
+ */
+
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 

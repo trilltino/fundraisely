@@ -1,3 +1,19 @@
+/**
+ * Footer - Landing Page Footer with Links
+ *
+ * **Purpose:** Standard website footer with branding, legal links, and copyright notice.
+ * Displayed at bottom of landing page.
+ *
+ * **Layout:** 3-column responsive layout (stacks on mobile):
+ * - Left: FundRaisely logo + name
+ * - Center: Legal links (Terms, Privacy, Contact)
+ * - Right: Copyright notice
+ *
+ * **Links:** Currently placeholder (#) - need to be updated with actual legal pages.
+ *
+ * @component
+ * @category Layout
+ */
 
 import type React from 'react';
 import { Gamepad2 } from 'lucide-react';

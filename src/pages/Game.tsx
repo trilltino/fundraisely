@@ -54,16 +54,15 @@
  * - Framer Motion for animations
  */
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PlayerList } from '../components/bingo/PlayerList';
 import { GameAccessAlert } from '../components/bingo/alerts/GameAccessAlert';
 import GameOverScreen from '../components/bingo/GameOverScreen';
 import { useGame } from '../hooks/useGame';
-import { useSocketV2 } from '../hooks/useSocketV2';
+import { useSocket } from '../hooks/useSocket';
 import { useGameStore } from '../stores/gameStore';
-import { useSocketStore } from '../stores/socketStore';
 import { WinnerDisplay } from '../components/landing/WinnerDisplay';
 import { GameHeader } from '../components/bingo/GameHeader';
 import { GameLoader } from '../components/bingo/GameLoader';
@@ -72,8 +71,6 @@ import { GameScreen } from '../components/bingo/GameScreen';
 import { getRoomCreationData } from '../utils/localStorageUtils';
 
 export function Game() {
-  console.log('[Game] [LAUNCH] Mounting Game component', { roomId: useParams().roomId });
-
   const { roomId = '' } = useParams();
   const navigate = useNavigate();
   const [showAccessError, setShowAccessError] = useState(false);
@@ -121,11 +118,8 @@ export function Game() {
     lineWinClaimed,
   });
 
-  // Initialize socket connection using new architecture
-  useSocketV2(roomId);
-
-  // Get socket instance from store
-  const socket = useSocketStore(state => state.socket);
+  // Initialize socket connection using original working hook
+  const { socket } = useSocket(roomId);
 
   const {
     gameState,
@@ -357,34 +351,50 @@ export function Game() {
   const isHost = currentPlayer?.isHost || false;
   const isWinner = lineWinners.some((w) => w.id === socket?.id) || fullHouseWinners.some((w) => w.id === socket?.id);
 
-  console.log('[Game]  Current player and host status', {
-    currentPlayer,
-    isHost,
-    isWinner,
+  // ✅ OPTIMIZED: Calculate dynamic stats with useMemo (from React docs: "You Might Not Need an Effect")
+  // These values are derived from props/state, so we calculate them during render with memoization
+  const gameStats = useMemo(() => {
+    const realPlayersCount = Math.max(0, (Array.isArray(players) ? players.length : 0) - 1);
+    const totalIntake = entryFee ? realPlayersCount * entryFee : 0;
+    const hostReward = totalIntake * 0.25;
+    const playerPrizePool = totalIntake * 0.60;
+    const linePrize = playerPrizePool * 0.30;
+    const fullHousePrize = playerPrizePool * 0.70;
+    const maxPlayersAllowed = entryFee ? Math.floor(1000 / entryFee) : 0;
+    const isRoomFull = maxPlayersAllowed > 0 && realPlayersCount >= maxPlayersAllowed;
+
+    return {
+      realPlayersCount,
+      totalIntake,
+      hostReward,
+      playerPrizePool,
+      linePrize,
+      fullHousePrize,
+      maxPlayersAllowed,
+      isRoomFull,
+    };
+  }, [players, entryFee]);
+
+  // Move console.logs to useEffect to avoid side effects during render
+  useEffect(() => {
+    console.log('[Game] [LAUNCH] Mounting/Updating Game component', { roomId });
+  }, [roomId]);
+
+  useEffect(() => {
+    console.log('[Game]  Current player and host status', {
+      currentPlayer,
+      isHost,
+      isWinner,
+    });
+  }, [currentPlayer, isHost, isWinner]);
+
+  useEffect(() => {
+    console.log('[Game] [STATS] Game stats', gameStats);
+  }, [gameStats]);
+
+  useEffect(() => {
+    console.log('[Game] ↩️ Rendering component', { roomId, socketId: socket?.id });
   });
-
-  // [TARGET] Calculate dynamic stats
-  const realPlayersCount = Math.max(0, (Array.isArray(players) ? players.length : 0) - 1);
-  const totalIntake = entryFee ? realPlayersCount * entryFee : 0;
-  const hostReward = totalIntake * 0.25;
-  const playerPrizePool = totalIntake * 0.60;
-  const linePrize = playerPrizePool * 0.30;
-  const fullHousePrize = playerPrizePool * 0.70;
-  const maxPlayersAllowed = entryFee ? Math.floor(1000 / entryFee) : 0;
-  const isRoomFull = maxPlayersAllowed > 0 && realPlayersCount >= maxPlayersAllowed;
-
-  console.log('[Game] [STATS] Game stats', {
-    realPlayersCount,
-    totalIntake,
-    hostReward,
-    playerPrizePool,
-    linePrize,
-    fullHousePrize,
-    maxPlayersAllowed,
-    isRoomFull,
-  });
-
-  console.log('[Game] ↩️ Rendering component', { roomId, socketId: socket?.id });
 
   return (
     <div className="container mx-auto px-4 py-20 min-h-screen bg-gradient-to-b from-indigo-50 to-white">
@@ -402,7 +412,7 @@ export function Game() {
 
       {entryFee && (
         <motion.div
-          key={realPlayersCount}
+          key={gameStats.realPlayersCount}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -413,30 +423,30 @@ export function Game() {
             <div>
               <p className="font-semibold">Players</p>
               <p>
-                {realPlayersCount} / {maxPlayersAllowed}
+                {gameStats.realPlayersCount} / {gameStats.maxPlayersAllowed}
               </p>
             </div>
             <div>
               <p className="font-semibold">Total Intake</p>
-              <p>{totalIntake.toFixed(2)} USDC</p>
+              <p>{gameStats.totalIntake.toFixed(2)} USDC</p>
             </div>
             <div>
               <p className="font-semibold">Host Reward</p>
-              <p>{hostReward.toFixed(2)} USDC</p>
+              <p>{gameStats.hostReward.toFixed(2)} USDC</p>
             </div>
             <div>
               <p className="font-semibold">Line Prize</p>
-              <p>{linePrize.toFixed(2)} USDC</p>
+              <p>{gameStats.linePrize.toFixed(2)} USDC</p>
             </div>
             <div>
               <p className="font-semibold">Full House Prize</p>
-              <p>{fullHousePrize.toFixed(2)} USDC</p>
+              <p>{gameStats.fullHousePrize.toFixed(2)} USDC</p>
             </div>
           </div>
         </motion.div>
       )}
 
-      {isRoomFull && (
+      {gameStats.isRoomFull && (
         <div className="bg-red-100 border border-red-300 text-red-800 rounded-xl p-4 mb-6 text-center shadow-md">
           [URGENT] Room Full! No more players can join this event.
         </div>

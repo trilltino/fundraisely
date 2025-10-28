@@ -1,3 +1,168 @@
+/**
+ * Payment Reconciliation Panel - Financial Tracking Dashboard
+ *
+ * **Purpose:** Sub-panel of HostDashboard providing comprehensive financial overview of quiz
+ * revenue. Aggregates entry fees + fundraising extras by payment method, shows paid/unpaid
+ * players, and calculates totals for end-of-quiz reconciliation.
+ *
+ * **Key Features:**
+ * 1. **Entry Fee Tracking**: Total expected vs. received entry fees
+ * 2. **Extras Revenue**: Aggregate fundraising extras income
+ * 3. **Payment Method Breakdown**: Cash vs. Revolut vs. Other split
+ * 4. **Percentage Analysis**: Each method's % of total revenue
+ * 5. **Unpaid Player List**: Red-flagged players who haven't paid entry
+ *
+ * **Financial Calculations:**
+ *
+ * **Entry Fees:**
+ * ```
+ * Expected Entry = entryFee × totalPlayers
+ * Received Entry = entryFee × paidPlayers.length
+ * Outstanding = Expected - Received
+ * ```
+ *
+ * **Example:**
+ * - Entry fee: €10
+ * - Total players: 20
+ * - Paid players: 18
+ * - Expected: €200
+ * - Received: €180
+ * - Outstanding: €20 (2 unpaid)
+ *
+ * **Extras Revenue:**
+ * ```
+ * For each player:
+ *   For each player.extraPayments entry:
+ *     Add amount to paymentMethod total
+ * ```
+ *
+ * **Example:**
+ * - Player1 bought buyHint (cash, €1.50)
+ * - Player2 bought extraTime (revolut, €0.75)
+ * - Player3 bought buyHint × 2 (cash, €3.00)
+ * - Total extras: €5.25
+ * - Cash extras: €4.50
+ * - Revolut extras: €0.75
+ *
+ * **Payment Data Structure:**
+ * ```typescript
+ * paymentData: {
+ *   cash: { entry: 90, extras: 4.50, total: 94.50 },
+ *   revolut: { entry: 90, extras: 0.75, total: 90.75 },
+ *   unknown: { entry: 0, extras: 0, total: 0 }
+ * }
+ * ```
+ *
+ * **Aggregation Algorithm:**
+ * ```
+ * 1. Initialize paymentData = {}
+ * 2. For each player:
+ *    a. If paid entry → Add entryFee to paymentData[player.paymentMethod].entry
+ *    b. For each extraPayment:
+ *       - Add amount to paymentData[extraPayment.method].extras
+ * 3. Calculate totals: entry + extras per method
+ * ```
+ *
+ * **Table Breakdown Display:**
+ * 5-column table:
+ * - **Payment Method**: cash/revolut/web3/unknown (capitalized)
+ * - **Entry Fees**: Entry fee revenue for this method
+ * - **Extras**: Fundraising extras revenue for this method
+ * - **Total**: Entry + Extras for this method
+ * - **% of Total**: Percentage of grand total revenue
+ *
+ * **Example Table:**
+ * ```
+ * | Method   | Entry Fees | Extras | Total   | % of Total |
+ * |----------|-----------|--------|---------|------------|
+ * | Cash     | €90.00    | €4.50  | €94.50  | 51.2%      |
+ * | Revolut  | €90.00    | €0.75  | €90.75  | 48.8%      |
+ * | Total    | €180.00   | €5.25  | €185.25 | 100%       |
+ * ```
+ *
+ * **Summary Metrics (Grid Display):**
+ * - **Entry Fee**: €10 (or "Free")
+ * - **Total Players**: 20
+ * - **Expected Entry**: €200.00
+ * - **Received Entry**: €180.00
+ * - **Received Extras**: €5.25
+ * - **Total Received**: €185.25 (bold)
+ *
+ * **Unpaid Players Section:**
+ * Red-flagged list showing:
+ * - Player names who have `paid: false`
+ * - If all paid: Green "[COMPLETE] All players are paid. Ready to go!"
+ * - Used by host to chase outstanding payments
+ *
+ * **Use Cases:**
+ *
+ * **1. Pre-Quiz Check:**
+ * - Verify all players paid before starting
+ * - Chase unpaid players (call/message)
+ * - Decide whether to let unpaid players join
+ *
+ * **2. During Quiz:**
+ * - Track extras purchases as they happen
+ * - Monitor fundraising extras revenue in real-time
+ * - Verify payment methods match expectations
+ *
+ * **3. Post-Quiz Reconciliation:**
+ * - Final count of all revenue
+ * - Split by payment method for cash drawer reconciliation
+ * - Generate final financial report
+ * - Calculate charity donation amount
+ *
+ * **Integration with Other Panels:**
+ *
+ * **PlayerListPanel:**
+ * - Sets `player.paid` (entry fee payment status)
+ * - Sets `player.paymentMethod` (cash/revolut/web3/unknown)
+ *
+ * **FundraisingExtrasPanel:**
+ * - Adds `player.extraPayments` (extras purchases)
+ * - Format: `{ extraKey: { method: 'cash', amount: 1.50 } }`
+ *
+ * **Currency Handling:**
+ * Uses `config.currencySymbol` (default '€'):
+ * - Set in StepPaymentMethod
+ * - Applied to all monetary displays
+ * - Consistent across all panels
+ *
+ * **Web2 vs. Web3:**
+ * - **Web2**: All data manually entered by host (honor system)
+ * - **Web3**: Entry fees auto-verified on-chain, extras still manual (future: on-chain extras)
+ *
+ * **Zero Cases:**
+ * - **Free entry** (entryFee = 0): Shows "Free", expected = €0.00
+ * - **No extras**: Shows €0.00 for extras column
+ * - **No payments yet**: Empty table, all zeros
+ *
+ * **Percentage Calculation:**
+ * ```typescript
+ * percentage = (methodTotal / grandTotal) × 100
+ * // Rounded to 1 decimal place
+ * // Shows "—" if grandTotal is 0 (avoid division by zero)
+ * ```
+ *
+ * **Integration:**
+ * - Parent: HostDashboard (4th panel)
+ * - State: usePlayerStore (players array), useQuizConfig (entry fee, currency)
+ * - Related: PlayerListPanel (entry payment tracking)
+ * - Related: FundraisingExtrasPanel (extras payment tracking)
+ *
+ * **Future Enhancements:**
+ * - Export to CSV/Excel for accounting
+ * - Email financial report to host
+ * - Print receipt for each player
+ * - Charity donation calculator (after platform/host fees)
+ * - Real-time updates during quiz (WebSocket sync)
+ * - Payment gateway integration (Stripe/PayPal)
+ * - Refund tracking (if player cancels)
+ *
+ * @component
+ * @category Quiz Dashboard
+ */
+
 import React from 'react';
 import { usePlayerStore } from '../../../stores/quizPlayerStore';
 import { useQuizConfig } from '../useQuizConfig';

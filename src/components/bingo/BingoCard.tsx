@@ -111,6 +111,7 @@
  */
 
 import { motion } from 'framer-motion';
+import { memo } from 'react';
 import type { BingoCell } from '../../types/game';
 import { cn } from '../../utils/cn';
 
@@ -119,7 +120,13 @@ interface BingoCardProps {
   onCellClick: (index: number) => void;
 }
 
-export function BingoCard({ cells, onCellClick }: BingoCardProps) {
+/**
+ * BingoCard Component
+ *
+ * ✅ OPTIMIZED: Wrapped with React.memo to prevent unnecessary re-renders
+ * This component re-renders frequently during gameplay, so memoization is critical.
+ */
+export const BingoCard = memo(function BingoCard({ cells, onCellClick }: BingoCardProps) {
   const getColumnCells = (colIndex: number) =>
     Array.from({ length: 5 }, (_, row) => cells[row * 5 + colIndex]);
   
@@ -156,4 +163,4 @@ export function BingoCard({ cells, onCellClick }: BingoCardProps) {
       )}
     </div>
   );
-}
+});

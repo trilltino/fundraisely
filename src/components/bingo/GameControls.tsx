@@ -136,6 +136,7 @@
 // src/components/GameControls.tsx
 import { Play, Pause, ArrowLeft, PlayCircle, } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { memo, useEffect } from 'react';
 
 interface GameControlsProps {
   onToggleAutoPlay: () => void;
@@ -151,28 +152,38 @@ interface GameControlsProps {
   lineWinClaimed?: boolean;
 }
 
-export function GameControls({
+/**
+ * GameControls Component
+ *
+ * ✅ OPTIMIZED: Wrapped with React.memo to prevent unnecessary re-renders
+ * ✅ OPTIMIZED: Moved console.log from render phase to useEffect
+ */
+export const GameControls = memo(function GameControls({
   onToggleAutoPlay,
   onUnpauseGame,
- 
+
   hasWon,
   autoPlay,
   isPaused,
-  
+
   lineWinners = [],
   fullHouseWinners = [],
   lineWinClaimed = false,
 }: GameControlsProps) {
-  console.log('[GameControls] [LAUNCH] Rendering GameControls', {
-    isPaused,
-    lineWinners,
-    fullHouseWinners,
-    lineWinClaimed,
-    hasWon,
-    autoPlay,
-  });
-
   const navigate = useNavigate();
+
+  // ✅ OPTIMIZED: Side effects moved to useEffect instead of render phase
+  // (from React docs: "Keeping Components Pure")
+  useEffect(() => {
+    console.log('[GameControls] [LAUNCH] Rendering GameControls', {
+      isPaused,
+      lineWinners,
+      fullHouseWinners,
+      lineWinClaimed,
+      hasWon,
+      autoPlay,
+    });
+  }, [isPaused, lineWinners, fullHouseWinners, lineWinClaimed, hasWon, autoPlay]);
 
   const handleReturnToLanding = () => {
     if (window.confirm('Are you sure you want to return to the landing page?')) {
@@ -221,4 +232,4 @@ export function GameControls({
       </button>
     </div>
   );
-}
+});

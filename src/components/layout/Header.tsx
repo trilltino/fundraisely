@@ -1,3 +1,30 @@
+/**
+ * Header - Adaptive Navigation Bar
+ *
+ * **Purpose:** Fixed header with context-aware navigation. Shows different UI based on current
+ * page: game controls during Bingo, landing navigation on home page, minimal nav on pitch deck.
+ *
+ * **Layouts:**
+ *
+ * **Game Page (/game/:roomId):**
+ * - "Leave Game" button (with confirmation) | Player count badge | Room ID badge
+ *
+ * **Landing Page (/):**
+ * - FundRaisely logo | Navigation links (How It Works, Benefits, FAQ) | Pitch Deck link | Wallet button
+ *
+ * **Pitch Deck Page (/pitch-deck):**
+ * - FundRaisely logo | "Back to Home" link | Wallet button
+ *
+ * **Features:**
+ * - Fixed positioning (stays at top during scroll)
+ * - Backdrop blur effect for glassmorphism
+ * - Real-time player count from Zustand store
+ * - Confirmation dialog before leaving game
+ *
+ * @component
+ * @category Layout
+ */
+
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { ArrowLeft, Users, Gamepad2 } from 'lucide-react';
 import { useGameStore } from '@/stores/gameStore';

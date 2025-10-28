@@ -81,6 +81,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../stores/gameStore';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useRoomVerification } from '../hooks/useRoomVerification';
+import { storageService } from '../services/storageService';
 import {
   isLocalStorageAvailable,
   saveRoomCreationData,
@@ -215,8 +216,9 @@ export function TestCampaign() {
       return;
     }
 
-    // Store walletAddress for rejoin
-    localStorage.setItem('walletAddress', roomData.walletAddress);
+    // Store playerName and walletAddress for rejoin using storageService
+    storageService.setPlayerName(roomData.playerName);
+    storageService.setWalletAddress(roomData.walletAddress);
 
     console.log('[TestCampaign] ️ Navigating to game', { roomId: roomData.roomId });
     navigate(`/game/${roomData.roomId}`);
@@ -282,6 +284,9 @@ export function TestCampaign() {
 
     console.log('[TestCampaign]  Saving roomJoiningData', roomJoiningData);
     saveRoomJoiningData(roomJoiningData);
+
+    // Store playerName for socket initialization using storageService
+    storageService.setPlayerName(roomData.playerName);
 
     console.log('[TestCampaign]  Saving paymentProof', {
       roomId: roomData.roomCode.toUpperCase(),

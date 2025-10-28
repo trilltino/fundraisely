@@ -304,6 +304,240 @@ export function setupSocketHandlers(io) {
       }
     });
 
+    // Handle quiz room creation
+    socket.on('create_quiz_room', (data) => {
+      try {
+        console.log('📝 Creating quiz room:', data);
+
+        // Rate limiting
+        if (rateLimiter.isRateLimited(socket.id, 'create_quiz_room', 3, 60000)) {
+          socket.emit('quiz_error', { message: 'Too many room creation attempts' });
+          return;
+        }
+
+        const { roomId, hostId, config } = data;
+
+        // Validate input
+        if (!roomId || !config) {
+          socket.emit('quiz_error', { message: 'Missing required fields' });
+          return;
+        }
+
+        // Create room with quiz config
+        const room = roomManager.createRoom(
+          roomId,
+          socket.id,
+          hostId || socket.id,
+          null, // contractAddress (not used for quiz yet)
+          config.entryFee || 0
+        );
+
+        // Store quiz config in room
+        room.quizConfig = config;
+        room.isQuiz = true;
+
+        // Add creator as host
+        roomManager.addPlayer(roomId, socket.id, {
+          wallet: hostId,
+          name: config.hostName || 'Host',
+          isHost: true,
+        });
+
+        // Join socket room
+        socket.join(roomId);
+
+        console.log('✅ Quiz room created:', roomId);
+
+        // Emit success
+        socket.emit('quiz_room_created', { roomId });
+        emitRoomUpdate(io, roomId);
+      } catch (error) {
+        console.error('❌ Create quiz room error:', error);
+        socket.emit('quiz_error', { message: error.message });
+      }
+    });
+
+    // Handle quiz room verification
+    socket.on('verify_quiz_room', ({ roomId }) => {
+      try {
+        console.log('🔍 Verifying quiz room:', roomId);
+        const room = roomManager.getRoom(roomId);
+
+        if (room && room.isQuiz) {
+          console.log('✅ Quiz room verified:', roomId, {
+            paymentMethod: room.quizConfig?.paymentMethod,
+            web3Chain: room.quizConfig?.web3Chain,
+            roomContractAddress: room.quizConfig?.roomContractAddress,
+          });
+
+          // Return full config for Web3 payment flow
+          socket.emit('quiz_room_verification_result', {
+            roomId,
+            exists: true,
+            config: room.quizConfig, // Return full config including blockchain details
+            paymentMethod: room.quizConfig?.paymentMethod || 'cash',
+            entryFee: room.quizConfig?.entryFee || '0',
+          });
+        } else {
+          console.log('❌ Quiz room not found:', roomId);
+          socket.emit('quiz_room_verification_result', {
+            roomId,
+            exists: false,
+          });
+        }
+      } catch (error) {
+        console.error('❌ Verify quiz room error:', error);
+        socket.emit('quiz_room_verification_result', {
+          roomId,
+          exists: false,
+        });
+      }
+    });
+
+    // Handle toggle ready for quiz
+    socket.on('toggle_ready_quiz', ({ roomId, playerId }) => {
+      try {
+        const room = roomManager.getRoom(roomId);
+        if (!room) {
+          socket.emit('quiz_error', { message: 'Room not found' });
+          return;
+        }
+
+        // Find player by socket.id and toggle ready state
+        const player = room.players.get(socket.id);
+        if (!player) {
+          socket.emit('quiz_error', { message: 'Player not in room' });
+          return;
+        }
+
+        player.isReady = !player.isReady;
+        console.log(`✓ Player ${player.name} ready status: ${player.isReady}`);
+
+        // Emit room update to all players
+        emitRoomUpdate(io, roomId);
+      } catch (error) {
+        console.error('Toggle ready quiz error:', error);
+        socket.emit('quiz_error', { message: error.message });
+      }
+    });
+
+    // Handle quiz start event
+    socket.on('quiz_started', ({ roomId }) => {
+      try {
+        const room = roomManager.getRoom(roomId);
+        if (!room) {
+          socket.emit('quiz_error', { message: 'Room not found' });
+          return;
+        }
+
+        // Verify all players are ready
+        let allReady = true;
+        for (const player of room.players.values()) {
+          if (!player.isReady && !player.isHost) {
+            allReady = false;
+            break;
+          }
+        }
+
+        if (!allReady) {
+          socket.emit('quiz_error', { message: 'Not all players are ready' });
+          return;
+        }
+
+        // Mark game as started
+        room.gameStarted = true;
+        console.log(`🎮 Quiz started in room ${roomId}`);
+
+        // Notify all players in the room that the quiz has started
+        io.to(roomId).emit('quiz_started', { roomId });
+
+        // Update room state
+        emitRoomUpdate(io, roomId);
+      } catch (error) {
+        console.error('Quiz started error:', error);
+        socket.emit('quiz_error', { message: error.message });
+      }
+    });
+
+    // Handle quiz player joining
+    socket.on('join_quiz_room', (data) => {
+      try {
+        console.log('👤 Player joining quiz room:', data);
+
+        const { roomId, user, role } = data;
+
+        const room = roomManager.getRoom(roomId);
+        if (!room) {
+          socket.emit('quiz_error', { message: 'Room not found' });
+          return;
+        }
+
+        if (room.gameStarted) {
+          socket.emit('quiz_error', { message: 'Game already started' });
+          return;
+        }
+
+        // For Web3 payments, verify transaction signature format
+        if (user.paymentMethod === 'web3' && user.web3TxHash) {
+          console.log('🔗 Web3 payment detected:', {
+            chain: user.web3Chain,
+            txHash: user.web3TxHash,
+            address: user.web3Address,
+          });
+
+          // Basic validation - check signature format
+          if (user.web3Chain === 'solana') {
+            // Solana signatures are base58 encoded, typically 87-88 characters
+            if (!user.web3TxHash || user.web3TxHash.length < 80 || user.web3TxHash.length > 90) {
+              socket.emit('quiz_error', { message: 'Invalid Solana transaction signature format' });
+              return;
+            }
+          }
+
+          // Store payment proof with player data
+          user.paymentProof = {
+            chain: user.web3Chain,
+            txHash: user.web3TxHash,
+            address: user.web3Address,
+            timestamp: Date.now(),
+          };
+        }
+
+        // Add player
+        roomManager.addPlayer(roomId, socket.id, {
+          wallet: user.web3Address || user.id,
+          name: user.name || 'Player',
+          isHost: false,
+          isReady: false,
+          paid: user.paid || false,
+          paymentMethod: user.paymentMethod || 'cash',
+          paymentProof: user.paymentProof,
+          extras: user.extras || [],
+        });
+
+        // Join socket room
+        socket.join(roomId);
+
+        console.log('✅ Player joined quiz room:', roomId, user.name, {
+          paid: user.paid,
+          paymentMethod: user.paymentMethod,
+        });
+
+        // Emit success to the joining player
+        socket.emit('quiz_player_joined', {
+          roomId,
+          playerId: user.id,
+          playerName: user.name
+        });
+
+        // Emit room state to all players
+        emitRoomUpdate(io, roomId);
+      } catch (error) {
+        console.error('❌ Join quiz room error:', error);
+        socket.emit('quiz_error', { message: error.message });
+      }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
       console.log(`[ERROR] Client disconnected: ${socket.id}`);

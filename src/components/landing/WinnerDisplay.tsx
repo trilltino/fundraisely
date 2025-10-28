@@ -1,3 +1,20 @@
+/**
+ * Winner Display - Bingo Game Winner Announcement Component
+ *
+ * **Purpose:** Displays line and full house winners during/after Bingo game. Shows winner
+ * names in colored badges differentiating line winners (indigo) from full house winners (purple).
+ *
+ * **Winner Types:**
+ * - **Line Winners**: Players who completed any valid line (horizontal/vertical/diagonal)
+ * - **Full House Winners**: Players who marked all 25 cells on their card
+ *
+ * **Display:** Line winners in indigo badges, full house winners in purple badges.
+ * **Empty state:** Returns null if no winners.
+ *
+ * @component
+ * @category Bingo Components
+ */
+
 // src/components/WinnerDisplay.tsx
 import type React from 'react';
 

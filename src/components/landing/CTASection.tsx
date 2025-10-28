@@ -1,3 +1,19 @@
+/**
+ * CTA Section - Call-to-Action for Conversions
+ *
+ * **Purpose:** Final conversion push with 2 action buttons: "Host an Event" (primary CTA)
+ * and "Learn More" (secondary, reduces friction for unsure visitors).
+ *
+ * **Button Actions:**
+ * - **Host an Event**: Scrolls to #create-room-section (Bingo/Quiz wizard)
+ * - **Learn More**: Scrolls to #how-it-works section (more info before commitment)
+ *
+ * **Design:** Gradient purple-indigo background with white/light buttons for high contrast.
+ *
+ * @component
+ * @category Landing Page
+ */
+
 import type React from 'react';
 
 const CTASection: React.FC = () => {

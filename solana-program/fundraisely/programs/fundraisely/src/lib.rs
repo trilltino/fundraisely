@@ -247,7 +247,11 @@ pub struct InitPoolRoom<'info> {
     )]
     pub room: Account<'info, Room>,
 
-    /// CHECK: Room vault PDA will be validated by seeds
+    /// CHECK: Room vault PDA - will be initialized as TokenAccount by frontend before or during room creation.
+    /// SECURITY: Handler validates this is a proper TokenAccount with correct mint/authority.
+    /// Using AccountInfo to avoid initialization order issues (room must exist before vault can use it as authority).
+    /// The handler performs manual deserialization and validation of TokenAccount structure.
+    /// Mutability is not enforced by constraint since this is AccountInfo - writable via account list order.
     #[account(
         seeds = [b"room-vault", room.key().as_ref()],
         bump
@@ -295,13 +299,14 @@ pub struct JoinRoom<'info> {
     )]
     pub player_entry: Account<'info, PlayerEntry>,
 
-    /// CHECK: Room vault PDA validated by seeds
+    /// Room vault token account - receives player's entry fee tokens.
+    /// SECURITY: Properly typed as TokenAccount to ensure correct account validation.
     #[account(
         mut,
         seeds = [b"room-vault", room.key().as_ref()],
         bump
     )]
-    pub room_vault: AccountInfo<'info>,
+    pub room_vault: Account<'info, anchor_spl::token::TokenAccount>,
 
     #[account(mut)]
     pub player_token_account: Account<'info, anchor_spl::token::TokenAccount>,

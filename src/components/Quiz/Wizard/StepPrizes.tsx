@@ -1,3 +1,83 @@
+/**
+ * Step Prizes - Prize Configuration and Distribution
+ *
+ * **Purpose:** Step 5 of quiz wizard. Configures how prize pool is distributed to winners.
+ * Supports two modes: percentage-based split (Web3) or fixed cash prizes (Web2).
+ *
+ * **Prize Modes:**
+ * 1. **Split Mode** (Web3 only):
+ *    - Divide prize pool by percentages (e.g., 1st: 60%, 2nd: 30%, 3rd: 10%)
+ *    - Total must equal ≤100%
+ *    - Remainder goes to charity if total <100%
+ *    - Enforced by smart contract during distribution
+ *
+ * 2. **Cash Mode** (Web2):
+ *    - Manually define fixed prize amounts
+ *    - No blockchain enforcement
+ *    - Host responsible for manual distribution
+ *    - Up to 10 prizes supported
+ *
+ * 3. **Assets Mode** (Web3, future):
+ *    - NFTs or specific tokens as prizes
+ *    - Not yet implemented
+ *
+ * **Validation Rules:**
+ * - **Split mode**: Must have at least 1st place percentage
+ * - **Split mode**: Total percentages cannot exceed 100%
+ * - **Cash mode**: All prizes must have description
+ * - **Cash mode**: Prize values must be non-negative numbers
+ *
+ * **Prize Split Calculation Example:**
+ * ```typescript
+ * // User input:
+ * splits = { 1: 60, 2: 30, 3: 10 }  // Total: 100%
+ *
+ * // If prize pool is 100 USDC after entry fees collected:
+ * 1st place: 60 USDC
+ * 2nd place: 30 USDC
+ * 3rd place: 10 USDC
+ * Charity: 0 USDC (all allocated to prizes)
+ *
+ * // If splits = { 1: 50, 2: 30 }  // Total: 80%
+ * 1st place: 50 USDC
+ * 2nd place: 30 USDC
+ * 3rd place: 0 USDC
+ * Charity: 20 USDC (remaining 20% goes to charity)
+ * ```
+ *
+ * **Dynamic Prize Count:**
+ * - Cash mode: Add/remove prizes dynamically (up to 10)
+ * - Split mode: Define splits for 1st, 2nd, 3rd places (optional 2nd/3rd)
+ * - Each prize has: `place` (number), `description` (string), `value` (number), optional `sponsor`
+ *
+ * **Currency Display:**
+ * - Web3: Uses `web3Currency` from config (USDC, SOL, etc.)
+ * - Web2: Uses `currencySymbol` from config (€, $, £, etc.)
+ *
+ * **State Management:**
+ * - Local: `splits` (Record<place, percentage>), `prizes` (Prize[]), `prizeMode`, `error`
+ * - Global: Saves to `useQuizConfig.config.{prizeSplits, prizes, prizeMode}`
+ *
+ * **Integration:**
+ * - Parent: QuizWizard (Step 5 of 8)
+ * - Previous: StepFundraisingOptions
+ * - Next: StepRoundSettings
+ * - Used by: StepReviewLaunch (displays prize config), Solana program (enforces splits on-chain)
+ *
+ * **Blockchain Integration:**
+ * For Web3 rooms, prize splits are encoded in the Room account:
+ * ```rust
+ * // Solana program: state/room.rs
+ * pub struct Room {
+ *   prize_distribution: Vec<u8>, // [60, 30, 10] for 1st/2nd/3rd percentages
+ *   // ... other fields
+ * }
+ * ```
+ *
+ * @component
+ * @category Quiz Wizard
+ */
+
 import { useState, type FC, type FormEvent } from 'react';
 import { useQuizConfig } from '../useQuizConfig';
 import type { WizardStepProps } from './WizardStepProps';

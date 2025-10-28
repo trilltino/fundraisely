@@ -17,6 +17,36 @@
  * - Idempotent updates
  * - Separate concern from game state
  * - Easy player queries
+ * - **Immer middleware for safe array mutations**
+ *
+ * **IMMER BENEFITS FOR ARRAY OPERATIONS:**
+ * Player store has complex array operations that become much cleaner with Immer:
+ *
+ * **Before (manual spreading):**
+ * ```typescript
+ * addPlayer: (player) => {
+ *   set({ players: [...get().players, player] }); // Spread entire array
+ * };
+ * updatePlayer: (id, updates) => {
+ *   const updated = [...players];
+ *   updated[index] = { ...updated[index], ...updates }; // Double spread
+ *   set({ players: updated });
+ * };
+ * ```
+ *
+ * **After (Immer mutations):**
+ * ```typescript
+ * addPlayer: (player) => {
+ *   set((state) => {
+ *     state.players.push(player); // Direct push!
+ *   });
+ * };
+ * updatePlayer: (id, updates) => {
+ *   set((state) => {
+ *     state.players[index] = { ...state.players[index], ...updates }; // Simpler
+ *   });
+ * };
+ * ```
  *
  * USAGE:
  * ```typescript
@@ -38,6 +68,7 @@
  */
 
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 import type { Player } from '../types/game';
 
 export interface PlayerStore {
@@ -72,91 +103,108 @@ const createInitialState = () => ({
   joinError: '',
 });
 
-export const usePlayerStore = create<PlayerStore>()((set, get) => ({
-  ...createInitialState(),
+export const usePlayerStore = create<PlayerStore>()(
+  immer((set, get) => ({
+    ...createInitialState(),
 
-  // Set entire player list
-  setPlayers: (players) => {
-    set({ players });
-  },
+    // Set entire player list
+    setPlayers: (players) => {
+      set((state) => {
+        state.players = players;
+      });
+    },
 
-  // Set current player name
-  setPlayerName: (playerName) => {
-    if (get().playerName !== playerName) {
-      set({ playerName });
-    }
-  },
+    // Set current player name
+    setPlayerName: (playerName) => {
+      set((state) => {
+        if (state.playerName !== playerName) {
+          state.playerName = playerName;
+        }
+      });
+    },
 
-  // Set join error message
-  setJoinError: (joinError) => {
-    if (get().joinError !== joinError) {
-      set({ joinError });
-    }
-  },
+    // Set join error message
+    setJoinError: (joinError) => {
+      set((state) => {
+        if (state.joinError !== joinError) {
+          state.joinError = joinError;
+        }
+      });
+    },
 
-  // Add a single player
-  addPlayer: (player) => {
-    const { players } = get();
-    if (!players.find(p => p.id === player.id)) {
-      set({ players: [...players, player] });
-    }
-  },
+    // Add a single player
+    // With Immer: Direct push instead of array spreading
+    addPlayer: (player) => {
+      set((state) => {
+        if (!state.players.find(p => p.id === player.id)) {
+          state.players.push(player);
+        }
+      });
+    },
 
-  // Remove a player by ID
-  removePlayer: (playerId) => {
-    const { players } = get();
-    const filtered = players.filter(p => p.id !== playerId);
-    if (filtered.length !== players.length) {
-      set({ players: filtered });
-    }
-  },
+    // Remove a player by ID
+    // With Immer: Use splice or reassignment
+    removePlayer: (playerId) => {
+      set((state) => {
+        const index = state.players.findIndex(p => p.id === playerId);
+        if (index !== -1) {
+          state.players.splice(index, 1);
+        }
+      });
+    },
 
-  // Update specific player properties
-  updatePlayer: (playerId, updates) => {
-    const { players } = get();
-    const index = players.findIndex(p => p.id === playerId);
+    // Update specific player properties
+    // With Immer: Direct index mutation (much cleaner!)
+    updatePlayer: (playerId, updates) => {
+      set((state) => {
+        const index = state.players.findIndex(p => p.id === playerId);
+        if (index !== -1) {
+          // Immer allows direct property assignment on draft objects
+          Object.assign(state.players[index], updates);
+        }
+      });
+    },
 
-    if (index !== -1) {
-      const updated = [...players];
-      updated[index] = { ...updated[index], ...updates };
-      set({ players: updated });
-    }
-  },
+    // Clear all players
+    clearPlayers: () => {
+      set((state) => {
+        if (state.players.length > 0) {
+          state.players = [];
+        }
+      });
+    },
 
-  // Clear all players
-  clearPlayers: () => {
-    if (get().players.length > 0) {
-      set({ players: [] });
-    }
-  },
+    // Reset to initial state
+    resetPlayerStore: () => {
+      set((state) => {
+        const initial = createInitialState();
+        Object.assign(state, initial);
+      });
+    },
 
-  // Reset to initial state
-  resetPlayerStore: () => {
-    set(createInitialState());
-  },
+    // Get current player (by stored playerName)
+    getCurrentPlayer: () => {
+      const state = get();
+      return state.players.find(p => p.name === state.playerName);
+    },
 
-  // Get current player (by stored playerName)
-  getCurrentPlayer: () => {
-    const { players, playerName } = get();
-    return players.find(p => p.name === playerName);
-  },
+    // Get player by ID
+    getPlayerById: (id) => {
+      return get().players.find(p => p.id === id);
+    },
 
-  // Get player by ID
-  getPlayerById: (id) => {
-    return get().players.find(p => p.id === id);
-  },
+    // Get all ready players
+    getReadyPlayers: () => {
+      return get().players.filter(p => p.isReady);
+    },
 
-  // Get all ready players
-  getReadyPlayers: () => {
-    return get().players.filter(p => p.ready);
-  },
-
-  // Check if all players are ready
-  areAllPlayersReady: () => {
-    const { players } = get();
-    if (players.length === 0) return false;
-    return players.every(p => p.ready);
-  },
-}));
+    // Check if all players are ready
+    areAllPlayersReady: () => {
+      const players = get().players;
+      if (players.length === 0) return false;
+      return players.every(p => p.isReady);
+    },
+  }))
+);
 
 export default usePlayerStore;

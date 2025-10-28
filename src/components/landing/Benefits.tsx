@@ -1,3 +1,16 @@
+/**
+ * Benefits Section - Feature Highlights for Clubs & Charities
+ *
+ * **Purpose:** Showcases 6 key benefits targeting organizational pain points:
+ * license tracking, fraud prevention, multiple event types, audit trails,
+ * enforced compliance, public trust building.
+ *
+ * **Layout:** 2-column responsive grid, each card has icon + title + description.
+ *
+ * @component
+ * @category Landing Page
+ */
+
 import type React from 'react';
 import { Shield, CheckCircle, Users, Heart, Wallet, Gamepad2 } from 'lucide-react';
 

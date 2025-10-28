@@ -1,3 +1,21 @@
+/**
+ * FAQ Section - Frequently Asked Questions
+ *
+ * **Purpose:** Addresses 4 common objections/questions to reduce friction in conversion funnel:
+ * supported events, compliance mechanism, reporting features, licensing requirements.
+ *
+ * **4 FAQs:**
+ * 1. **What events?** Bingo, lotteries, quizzes with compliance controls
+ * 2. **How ensure compliance?** Auto-enforce legal limits on stakes, charity %, age
+ * 3. **What reporting?** Regulatory-ready reports with verified audit trails
+ * 4. **Need special licenses?** System guides through necessary permits
+ *
+ * **Conversion Strategy:** Reduces uncertainty by proactively answering questions before users have to ask.
+ *
+ * @component
+ * @category Landing Page
+ */
+
 import type React from 'react';
 
 const FAQ: React.FC = () => {

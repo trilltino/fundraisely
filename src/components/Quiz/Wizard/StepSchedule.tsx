@@ -1,3 +1,94 @@
+/**
+ * Step Schedule - Quiz Start Time Configuration
+ *
+ * **Purpose:** Step 7 of quiz wizard. Allows hosts to schedule when the quiz should start.
+ * Used for timing reminders, room opening, and coordinating player attendance. Simple step
+ * with single datetime input.
+ *
+ * **Key Features:**
+ * - **Local time input**: Uses HTML5 `datetime-local` input (browser handles timezone conversion)
+ * - **Required field**: Cannot proceed without selecting a start time
+ * - **Reminder system**: Server can send notifications before quiz starts (future feature)
+ * - **Room opening**: Auto-open room at scheduled time (future feature)
+ *
+ * **DateTime Format:**
+ * Input type `datetime-local` produces ISO 8601 format without timezone:
+ * ```
+ * User selects: "December 25, 2025 at 7:00 PM" (in their local timezone)
+ * Value stored: "2025-12-25T19:00"
+ * ```
+ *
+ * **Timezone Handling:**
+ * - **User perspective**: Always sees their local time (browser auto-adjusts)
+ * - **Storage**: Saved as ISO string without explicit timezone
+ * - **Server interpretation**: Should parse as UTC or store original timezone
+ * - **Display to others**: Convert to each player's local timezone
+ *
+ * **Example Use Cases:**
+ *
+ * **1. Scheduled Fundraiser:**
+ * - Host: "Quiz starts Friday, Dec 25, 2025 at 7:00 PM"
+ * - System sends email reminders 24h and 1h before
+ * - Room auto-opens 15 minutes early for player check-in
+ * - Game starts automatically at scheduled time
+ *
+ * **2. Immediate Start:**
+ * - Host: "Quiz starts now" (selects current datetime)
+ * - No reminders sent
+ * - Room immediately available
+ * - Host manually starts when ready
+ *
+ * **3. Recurring Event:**
+ * - Host: "Weekly trivia every Tuesday at 8:00 PM"
+ * - Create new quiz each week with same start time pattern
+ * - Players recognize consistent schedule
+ *
+ * **Validation:**
+ * - **Required**: HTML5 `required` attribute prevents empty submission
+ * - **No past date check**: Currently allows scheduling in past (could add validation)
+ * - **No minimum advance**: Can schedule 1 minute from now (could enforce minimum lead time)
+ *
+ * **Future Features (Not Yet Implemented):**
+ * - **Auto-start at scheduled time**: Room transitions to "active" automatically
+ * - **Reminder emails**: Send notifications to registered players
+ * - **Countdown display**: Show time until quiz starts on join page
+ * - **Timezone display**: Show "7:00 PM EST (1:00 AM GMT)" for clarity
+ * - **Recurring schedules**: "Every Tuesday at 8:00 PM" template
+ *
+ * **State Management:**
+ * - Local: `startTime` (controlled input, ISO datetime string)
+ * - Global: Saves to `useQuizConfig.config.startTime`
+ *
+ * **Integration:**
+ * - Parent: QuizWizard (Step 7 of 8)
+ * - Previous: StepRoundSettings (timing configuration)
+ * - Next: StepReviewLaunch (final deployment)
+ * - Used by: StepReviewLaunch (displays scheduled time in review)
+ * - Future: Server cron jobs, email notification system, room opening scheduler
+ *
+ * **Display in Review Step:**
+ * ```typescript
+ * // StepReviewLaunch.tsx shows:
+ * const formattedTime = new Date(config.startTime).toLocaleString();
+ * // "12/25/2025, 7:00:00 PM" (user's local timezone)
+ * ```
+ *
+ * **Storage:**
+ * Saved to server when room created:
+ * ```typescript
+ * socket.emit('create_quiz_room', {
+ *   roomId,
+ *   config: {
+ *     startTime: "2025-12-25T19:00", // ISO format
+ *     // ... other config
+ *   }
+ * });
+ * ```
+ *
+ * @component
+ * @category Quiz Wizard
+ */
+
 import { FC, useState } from 'react';
 import type { WizardStepProps } from './WizardStepProps';
 import { useQuizConfig } from '../useQuizConfig';

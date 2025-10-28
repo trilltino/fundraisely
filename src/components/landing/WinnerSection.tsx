@@ -1,3 +1,25 @@
+/**
+ * Winner Section - Reusable Winner Display Component
+ *
+ * **Purpose:** Generic component for displaying winner lists with optional wallet addresses.
+ * Used in game over screens to show 1st/2nd/3rd place winners or other winner categories.
+ *
+ * **Props:**
+ * - `title`: Section header (e.g., "1st Place Winners")
+ * - `color`: Theme color ('indigo' | 'purple') for background/text
+ * - `winners`: Array of winner objects with id, name, optional wallet address
+ *
+ * **Wallet Display:**
+ * If winner has wallet address, shows truncated format:
+ * - Example: "Alice (0x1234...5678)"
+ * - Format: First 6 chars + "..." + Last 4 chars
+ *
+ * **Empty State:** Shows "No {title.toLowerCase()}" when winners array empty.
+ *
+ * @component
+ * @category Landing Page
+ */
+
 import type React from 'react';
 
 interface Winner {

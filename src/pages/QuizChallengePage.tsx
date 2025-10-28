@@ -55,6 +55,8 @@
 
 // src/pages/QuizChallengePage.tsx
 import { useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 import JoinQuizModal from '../components/Quiz/joinroom/JoinQuizModal';
 import QuizWizard from '../components/Quiz/Wizard/QuizWizard';
@@ -62,27 +64,39 @@ import QuizWizard from '../components/Quiz/Wizard/QuizWizard';
 const QuizChallengePage = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const { connected } = useWallet();
 
   return (
     <div className="max-w-3xl mx-auto p-8">
-      <h1 className="text-4xl font-bold mb-6"> Quiz Challenge</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-4xl font-bold">Quiz Challenge</h1>
+        <WalletMultiButton />
+      </div>
+
       <p className="mb-8 text-gray-700">
-        Welcome to the ultimate fundraising quiz! Choose an action below to get started.
+        Welcome to the ultimate fundraising quiz!
+        {!connected && (
+          <span className="block mt-2 text-sm text-indigo-600 font-medium">
+            Connect your Phantom wallet to get started.
+          </span>
+        )}
       </p>
 
       <div className="flex flex-col sm:flex-row gap-4">
         <button
-          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold shadow hover:bg-indigo-700"
+          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold shadow hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => setShowWizard(true)}
+          disabled={!connected}
         >
-           Host a Quiz
+          Host a Quiz
         </button>
 
         <button
-          className="bg-white text-indigo-600 border border-indigo-600 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50"
+          className="bg-white text-indigo-600 border border-indigo-600 px-6 py-3 rounded-xl font-semibold hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => setShowJoinModal(true)}
+          disabled={!connected}
         >
-           Join a Quiz
+          Join a Quiz
         </button>
       </div>
 

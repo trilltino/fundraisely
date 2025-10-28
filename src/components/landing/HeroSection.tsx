@@ -1,3 +1,16 @@
+/**
+ * Hero Section - Landing Page Header with Value Proposition
+ *
+ * **Purpose:** First section users see. Communicates core value (compliant fundraising),
+ * key differentiators (fraud-proof, regulatory enforcement), builds trust with badges.
+ *
+ * **Key Elements:** Animated gamepad icon, gradient headline, mission statement,
+ * trust badges (Regulatory Enforcement, License Tracking, Audit Trail).
+ *
+ * @component
+ * @category Landing Page
+ */
+
 import type React from 'react';
 import { Gamepad2, Shield, Heart, Users } from 'lucide-react';
 

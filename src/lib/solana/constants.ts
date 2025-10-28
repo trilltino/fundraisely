@@ -9,7 +9,7 @@ import { PublicKey } from '@solana/web3.js'
 
 // Program ID (update with your deployed program ID)
 export const PROGRAM_ID = new PublicKey(
-  import.meta.env.VITE_PROGRAM_ID || '11111111111111111111111111111111'
+  import.meta.env.VITE_PROGRAM_ID || 'DurTiNFFQK62B5nMimfhuvztJXsFyu8skMz6rNtp2Wmq'
 )
 
 // PDA Seeds (centralized to prevent typos)

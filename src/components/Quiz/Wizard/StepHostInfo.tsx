@@ -1,4 +1,45 @@
-// components/quiz/wizard/StepHostInfo.tsx
+/**
+ * Step Host Info - Initial Wizard Step for Host Name Collection
+ *
+ * **Purpose:** First step in the 8-step quiz creation wizard. Collects and validates the host's
+ * display name which will be shown to players throughout the quiz and stored in quiz metadata.
+ *
+ * **Validation Rules:**
+ * - Minimum 2 characters required
+ * - Maximum 30 characters enforced by input maxLength
+ * - Special characters sanitized (only alphanumeric, spaces, underscores, hyphens allowed)
+ * - Leading/trailing whitespace trimmed
+ *
+ * **User Flow:**
+ * ```
+ * User enters name → Client-side validation → Sanitization → Save to useQuizConfig → Advance to Step 2
+ * ```
+ *
+ * **Sanitization:**
+ * Removes potentially unsafe characters: `[^a-zA-Z0-9 _-]`
+ * - Prevents XSS attacks via quiz metadata
+ * - Ensures consistent display across different UI contexts
+ * - Allows international characters to be removed (intentional ASCII-only policy)
+ *
+ * **State Management:**
+ * - Local state: `hostName` (controlled input), `error` (validation message)
+ * - Global state: Saves to `useQuizConfig.config.hostName` on submit
+ *
+ * **Integration:**
+ * - Parent: QuizWizard (Step 1 of 8)
+ * - Next step: StepGameType
+ * - No back button (first step)
+ * - Used later in: StepReviewLaunch (displays in review), HostDashboard (shows host name)
+ *
+ * **Error Handling:**
+ * - Empty input: "Host name must be at least 2 characters"
+ * - Single character: "Host name must be at least 2 characters"
+ * - Displays error below input field with red alert styling
+ *
+ * @component
+ * @category Quiz Wizard
+ */
+
 import { useState, type FC } from 'react';
 import type { FormEvent } from 'react';
 import { useQuizConfig } from '../useQuizConfig';

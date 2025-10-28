@@ -238,6 +238,30 @@ pub fn handler(
         FundraiselyError::EmergencyPause
     );
 
+    // SECURITY: Validate room_vault is a proper TokenAccount if it already exists
+    // If vault is not yet initialized, this validation is skipped (frontend will create it)
+    if !ctx.accounts.room_vault.data_is_empty() {
+        use anchor_spl::token::TokenAccount;
+
+        let vault_data = ctx.accounts.room_vault.try_borrow_data()
+            .map_err(|_| FundraiselyError::InvalidVaultAccount)?;
+
+        let vault_account = TokenAccount::try_deserialize(&mut vault_data.as_ref())
+            .map_err(|_| FundraiselyError::InvalidVaultAccount)?;
+
+        // Verify vault has correct mint
+        require!(
+            vault_account.mint == ctx.accounts.fee_token_mint.key(),
+            FundraiselyError::InvalidTokenMint
+        );
+
+        // Verify vault authority is the room PDA
+        require!(
+            vault_account.owner == ctx.accounts.room.key(),
+            FundraiselyError::InvalidVaultAuthority
+        );
+    }
+
     // Validate token is approved in registry
     require!(
         ctx.accounts.token_registry.is_token_approved(&ctx.accounts.fee_token_mint.key()),

@@ -1,4 +1,60 @@
-// components/quiz/wizard/StepGameType.tsx
+/**
+ * Step Game Type - Quiz Template Selection
+ *
+ * **Purpose:** Step 2 of quiz wizard. Allows host to select from predefined quiz templates
+ * (Pub Quiz, Speed Quiz, etc.) which auto-populate default settings for rounds, timing, and features.
+ *
+ * **Available Quiz Types:**
+ * Loaded from `quiztypeconstants.ts`:
+ * - **Pub Quiz**: Traditional multi-round quiz with moderate pacing
+ * - **Speed Quiz**: Fast-paced with shorter time limits
+ * - **Trivia Night**: Casual format with flexible timing
+ * - Each type has: `id`, `name`, `description`, `defaultConfig`, `fundraisingOptions`
+ *
+ * **Auto-Configuration:**
+ * When user selects a quiz type, the following config is automatically set:
+ * ```typescript
+ * {
+ *   gameType: selected.id,
+ *   teamBased: defaultConfig.teamBased ?? false,
+ *   roundCount: defaultConfig.roundCount ?? 0,
+ *   timePerQuestion: defaultConfig.timePerQuestion ?? 30,
+ *   useMedia: defaultConfig.useMedia ?? false,
+ *   fundraisingOptions: {} // Reset to allow customization in next step
+ * }
+ * ```
+ *
+ * **Template Benefits:**
+ * - **Faster setup**: Pre-configured settings reduce wizard steps for common use cases
+ * - **Best practices**: Templates encode proven quiz formats
+ * - **Consistency**: Multiple hosts can create similar quiz experiences
+ * - **Customizable**: Users can modify template settings in later steps
+ *
+ * **UI Interaction:**
+ * - Radio button selection (only one quiz type selected at a time)
+ * - Card-based layout with hover effects for visual feedback
+ * - Selected card highlighted with indigo border and background
+ * - Displays quiz type name, description, and key settings preview
+ *
+ * **Validation:**
+ * - Must select exactly one quiz type to proceed
+ * - Error if user tries to submit without selection: "Please select a quiz type"
+ * - Error if somehow invalid type ID selected: "Invalid quiz type selected"
+ *
+ * **State Management:**
+ * - Local: `selectedType` (string ID), `error` (validation message)
+ * - Global: Updates multiple `useQuizConfig` fields based on template defaults
+ *
+ * **Integration:**
+ * - Parent: QuizWizard (Step 2 of 8)
+ * - Previous: StepHostInfo
+ * - Next: StepPaymentMethod
+ * - Uses: `constants/quiztypeconstants.ts` for quiz type definitions
+ *
+ * @component
+ * @category Quiz Wizard
+ */
+
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 import { quizGameTypes } from '../../../constants/quiztypeconstants';
